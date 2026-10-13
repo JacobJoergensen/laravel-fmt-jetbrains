@@ -90,10 +90,10 @@ intellijPlatform {
             VerifyPluginTask.FailureLevel.EXPERIMENTAL_API_USAGES
 
         ides {
-            select {
+            current()
+            latest {
                 types = listOf(IntelliJPlatformType.PhpStorm)
                 channels = listOf(ProductRelease.Channel.RELEASE)
-                sinceBuild = providers.gradleProperty("pluginSinceBuild")
             }
         }
     }
