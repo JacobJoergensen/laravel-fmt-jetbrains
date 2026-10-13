@@ -1,0 +1,5 @@
+<!-- laravel-fmt plugin icon (40x40), matching the VS Code extension's icon. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+    <rect x="4" y="4" width="32" height="32" rx="4" fill="#FB503B"/>
+    <path d="M31.36 5.28 L31.36 12 L8.64 34.72 L8.64 28 Z" fill="#FFFFFF"/>
+</svg>

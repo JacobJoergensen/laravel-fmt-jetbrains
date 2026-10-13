@@ -1,0 +1,41 @@
+<idea-plugin>
+    <id>io.github.jacobjoergensen.laravel-fmt</id>
+    <name>laravel-fmt</name>
+    <vendor email="jj@minehubsstudios.com" url="https://github.com/jacobjoergensen/laravel-fmt">Jacob Jørgensen</vendor>
+
+    <resource-bundle>messages.LaravelFmtBundle</resource-bundle>
+
+    <depends>com.intellij.modules.ultimate</depends>
+    <depends>com.jetbrains.php</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <projectConfigurable
+            parentId="tools"
+            id="io.github.jacobjoergensen.laravelfmt.settings"
+            key="settings.display.name"
+            instance="io.github.jacobjoergensen.laravelfmt.LaravelFmtConfigurable"/>
+        <notificationGroup id="laravel-fmt" displayType="BALLOON" key="notification.group.name"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="com.intellij.platform.lsp">
+        <serverSupportProvider implementation="io.github.jacobjoergensen.laravelfmt.LaravelFmtLspServerSupportProvider"/>
+    </extensions>
+
+    <actions>
+        <action id="LaravelFmt.RestartServer" class="io.github.jacobjoergensen.laravelfmt.LaravelFmtRestartAction">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+    </actions>
+
+    <applicationListeners>
+        <listener
+            class="io.github.jacobjoergensen.laravelfmt.LaravelFmtTrustListener"
+            topic="com.intellij.ide.trustedProjects.TrustedProjectsListener"/>
+    </applicationListeners>
+
+    <projectListeners>
+        <listener
+            class="io.github.jacobjoergensen.laravelfmt.LaravelFmtVendorListener"
+            topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
+    </projectListeners>
+</idea-plugin>
