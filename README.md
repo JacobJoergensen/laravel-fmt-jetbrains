@@ -5,7 +5,7 @@ Formats PHP and Blade files with [laravel-fmt](https://github.com/jacobjoergense
 you run Reformat Code or save. It uses your project's laravel-fmt config, so you get the same output
 as the CLI.
 
-You'll need the binary: `composer require --dev jacobjoergensen/laravel-fmt:@beta`
+You'll need the binary: `composer require --dev jacobjoergensen/laravel-fmt`
 <!-- Plugin description end -->
 
 ## Requirements
