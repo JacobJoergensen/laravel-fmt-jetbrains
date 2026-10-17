@@ -1,7 +1,7 @@
 package io.github.jacobjoergensen.laravelfmt
 
 import com.intellij.execution.configurations.PathEnvironmentVariableUtil
-import com.intellij.ide.impl.isTrusted
+import com.intellij.ide.trustedProjects.TrustedProjects
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
@@ -99,7 +99,7 @@ class LaravelFmtServerService(private val project: Project) : Disposable {
 
     private fun compute(): Resolution {
         val explicitPath = LaravelFmtSettings.getInstance().binaryPath
-        val trusted = project.isTrusted()
+        val trusted = TrustedProjects.isProjectTrusted(project)
         val roots = projectRoots()
 
         val path = BinaryResolver.resolve(

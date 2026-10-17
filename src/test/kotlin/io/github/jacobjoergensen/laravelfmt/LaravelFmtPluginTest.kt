@@ -10,6 +10,7 @@ import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.lsp.api.LspServerDescriptor
 import com.intellij.platform.lsp.api.LspServerSupportProvider
+import com.intellij.platform.lsp.api.customization.LspFormattingSupport
 import com.intellij.testFramework.TestActionEvent
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
@@ -35,7 +36,7 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
     }
 
     fun `test the server takes over formatting from the built-in PHP formatter`() {
-        val formatting = LaravelFmtLspServerDescriptor(project).lspFormattingSupport
+        val formatting = LaravelFmtLspServerDescriptor(project).lspCustomization.formattingCustomizer as LspFormattingSupport
         val php = file("Example.php", "<?php echo 1;\n")
 
         assertTrue(formatting.shouldFormatThisFileExclusivelyByServer(php, true, false))

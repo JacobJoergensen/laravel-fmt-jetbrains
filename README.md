@@ -10,7 +10,7 @@ You'll need the binary: `composer require --dev jacobjoergensen/laravel-fmt`
 
 ## Requirements
 
-PhpStorm 2025.1 or later, or IntelliJ IDEA Ultimate with the PHP plugin.
+PhpStorm 2025.3 or later, or IntelliJ IDEA Ultimate with the PHP plugin.
 
 ## How it finds laravel-fmt
 

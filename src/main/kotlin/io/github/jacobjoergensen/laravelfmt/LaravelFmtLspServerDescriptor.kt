@@ -6,6 +6,8 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.lsp.api.ProjectWideLspServerDescriptor
+import com.intellij.platform.lsp.api.customization.LspCustomization
+import com.intellij.platform.lsp.api.customization.LspFormattingCustomizer
 import com.intellij.platform.lsp.api.customization.LspFormattingSupport
 import com.jetbrains.php.lang.PhpFileType
 import java.nio.charset.StandardCharsets
@@ -43,7 +45,9 @@ class LaravelFmtLspServerDescriptor(project: Project) : ProjectWideLspServerDesc
         return commandLine
     }
 
-    override val lspFormattingSupport: LspFormattingSupport = LaravelFmtFormattingSupport
+    override val lspCustomization: LspCustomization = object : LspCustomization() {
+        override val formattingCustomizer: LspFormattingCustomizer = LaravelFmtFormattingSupport
+    }
 
     /**
      * The IDE keeps formatting PHP and Blade itself by default, because it has its own formatter for them.
