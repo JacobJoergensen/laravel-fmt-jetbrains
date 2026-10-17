@@ -17,6 +17,16 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 /** Runs in a PhpStorm test instance, for the wiring unit tests can't reach: plugin.xml, services, actions. */
 class LaravelFmtPluginTest : BasePlatformTestCase() {
 
+    private val projectSettings get() = project.service<LaravelFmtProjectSettings>()
+
+    override fun tearDown() {
+        try {
+            projectSettings.loadState(LaravelFmtProjectSettings.State())
+        } finally {
+            super.tearDown()
+        }
+    }
+
     fun `test laravel-fmt is available as a language server`() {
         val providers = ExtensionPointName<LspServerSupportProvider>("com.intellij.platform.lsp.serverSupportProvider").extensionList
 
@@ -43,33 +53,42 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
     }
 
     fun `test server is not started when laravel-fmt is disabled for the project`() {
-        val settings = project.service<LaravelFmtProjectSettings>()
-        settings.enabled = false
+        projectSettings.enabled = false
 
-        try {
-            assertFalse(startsServerFor(file("Example.php", "<?php echo 1;\n")))
-        } finally {
-            settings.enabled = true
-        }
+        assertFalse(startsServerFor(file("Example.php", "<?php echo 1;\n")))
     }
 
-    fun `test laravel-fmt is enabled for a project by default`() {
-        assertTrue(project.service<LaravelFmtServerService>().isEnabled)
+    fun `test unchecking PHP leaves PHP files to the IDE but still formats Blade files`() {
+        projectSettings.formatPhp = false
+        val descriptor = LaravelFmtLspServerDescriptor(project)
+
+        assertFalse(descriptor.isSupportedFile(file("Example.php", "<?php echo 1;\n")))
+        assertTrue(descriptor.isSupportedFile(file("welcome.blade.php", "<div></div>\n")))
+    }
+
+    fun `test unchecking Blade leaves Blade files to the IDE even though they are PHP files`() {
+        projectSettings.formatBlade = false
+        val descriptor = LaravelFmtLspServerDescriptor(project)
+
+        assertFalse(descriptor.isSupportedFile(file("welcome.blade.php", "<div></div>\n")))
+        assertTrue(descriptor.isSupportedFile(file("Example.php", "<?php echo 1;\n")))
     }
 
     fun `test restart action is hidden when laravel-fmt is disabled for the project`() {
         val action = LaravelFmtRestartAction()
-        val settings = project.service<LaravelFmtProjectSettings>()
 
         assertTrue(updatedPresentationVisible(action))
 
-        settings.enabled = false
+        projectSettings.enabled = false
 
-        try {
-            assertFalse(updatedPresentationVisible(action))
-        } finally {
-            settings.enabled = true
-        }
+        assertFalse(updatedPresentationVisible(action))
+    }
+
+    fun `test restart action is hidden when no file type is checked`() {
+        projectSettings.formatPhp = false
+        projectSettings.formatBlade = false
+
+        assertFalse(updatedPresentationVisible(LaravelFmtRestartAction()))
     }
 
     fun `test settings page shows its name`() {

@@ -11,6 +11,7 @@ import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.Computable
 import com.intellij.openapi.util.SystemInfo
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.lsp.api.LspServerManager
 import com.intellij.util.concurrency.AppExecutorUtil
 import java.util.concurrent.ScheduledFuture
@@ -41,8 +42,16 @@ class LaravelFmtServerService(private val project: Project) : Disposable {
     @Volatile
     private var pendingRestart: ScheduledFuture<*>? = null
 
+    private val settings get() = project.service<LaravelFmtProjectSettings>()
+
     val isEnabled: Boolean
-        get() = project.service<LaravelFmtProjectSettings>().enabled
+        get() = settings.enabled && (settings.formatPhp || settings.formatBlade)
+
+    fun formats(file: VirtualFile): Boolean = settings.enabled && when (LaravelFmtLspServerDescriptor.fileKind(file)) {
+        LaravelFmtLspServerDescriptor.FileKind.PHP -> settings.formatPhp
+        LaravelFmtLspServerDescriptor.FileKind.BLADE -> settings.formatBlade
+        null -> false
+    }
 
     fun resolve(refresh: Boolean = false): Resolution {
         val current = cached

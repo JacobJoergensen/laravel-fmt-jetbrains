@@ -15,13 +15,9 @@ import com.intellij.platform.lsp.api.lsWidget.LspServerWidgetItem
 class LaravelFmtLspServerSupportProvider : LspServerSupportProvider {
 
     override fun fileOpened(project: Project, file: VirtualFile, serverStarter: LspServerSupportProvider.LspServerStarter) {
-        if (!LaravelFmtLspServerDescriptor.isFormattable(file)) {
-            return
-        }
-
         val server = project.service<LaravelFmtServerService>()
 
-        if (!server.isEnabled) {
+        if (!server.formats(file)) {
             return
         }
 

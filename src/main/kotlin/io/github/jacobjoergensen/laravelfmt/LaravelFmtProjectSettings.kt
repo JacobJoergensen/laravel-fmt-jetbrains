@@ -16,11 +16,25 @@ class LaravelFmtProjectSettings : SimplePersistentStateComponent<LaravelFmtProje
 
     class State : BaseState() {
         var enabled by property(true)
+        var formatPhp by property(true)
+        var formatBlade by property(true)
     }
 
     var enabled: Boolean
         get() = state.enabled
         set(value) {
             state.enabled = value
+        }
+
+    var formatPhp: Boolean
+        get() = state.formatPhp
+        set(value) {
+            state.formatPhp = value
+        }
+
+    var formatBlade: Boolean
+        get() = state.formatBlade
+        set(value) {
+            state.formatBlade = value
         }
 }

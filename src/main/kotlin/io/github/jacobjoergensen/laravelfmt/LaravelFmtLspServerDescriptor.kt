@@ -15,15 +15,15 @@ import java.nio.charset.StandardCharsets
 /** Only formatting is configured: the server advertises nothing else, so other LSP features stay off. */
 class LaravelFmtLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor(project, PRESENTABLE_NAME) {
 
-    override fun isSupportedFile(file: VirtualFile): Boolean = isFormattable(file)
-
-    override fun getLanguageId(file: VirtualFile): String {
-        if (isBlade(file)) {
-            return "blade"
-        }
-
-        return "php"
+    enum class FileKind(val languageId: String) {
+        PHP("php"),
+        BLADE("blade"),
     }
+
+    /** File types unchecked in the settings are never sent to the server, so the IDE keeps formatting them. */
+    override fun isSupportedFile(file: VirtualFile): Boolean = project.service<LaravelFmtServerService>().formats(file)
+
+    override fun getLanguageId(file: VirtualFile): String = (fileKind(file) ?: FileKind.PHP).languageId
 
     /**
      * The first run may download the binary (see [LaravelFmtLauncher]), which is fine here: the IDE calls
@@ -67,9 +67,11 @@ class LaravelFmtLspServerDescriptor(project: Project) : ProjectWideLspServerDesc
         private const val BLADE_SUFFIX = ".blade.php"
 
         /** Blade is matched by name, so `.blade.php` files are formatted as Blade even without the Blade plugin. */
-        fun isFormattable(file: VirtualFile): Boolean =
-            !file.isDirectory && (isBlade(file) || file.fileType == PhpFileType.INSTANCE)
-
-        private fun isBlade(file: VirtualFile): Boolean = file.name.endsWith(BLADE_SUFFIX, ignoreCase = true)
+        fun fileKind(file: VirtualFile): FileKind? = when {
+            file.isDirectory -> null
+            file.name.endsWith(BLADE_SUFFIX, ignoreCase = true) -> FileKind.BLADE
+            file.fileType == PhpFileType.INSTANCE -> FileKind.PHP
+            else -> null
+        }
     }
 }

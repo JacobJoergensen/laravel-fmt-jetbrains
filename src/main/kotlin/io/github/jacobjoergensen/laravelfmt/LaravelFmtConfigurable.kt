@@ -7,10 +7,13 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.TextBrowseFolderListener
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
+import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.dsl.builder.AlignX
+import com.intellij.ui.dsl.builder.Cell
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.builder.selected
 import java.io.File
 
 /** No formatting options on purpose: those come from the project config the server reads. */
@@ -30,10 +33,24 @@ class LaravelFmtConfigurable(private val project: Project) : BoundConfigurable(L
 
         return panel {
             group(LaravelFmtBundle.message("settings.group.project")) {
+                lateinit var enabled: Cell<JBCheckBox>
+
                 row {
-                    checkBox(LaravelFmtBundle.message("settings.enabled"))
+                    enabled = checkBox(LaravelFmtBundle.message("settings.enabled"))
                         .bindSelected(projectSettings::enabled)
                 }
+
+                indent {
+                    row {
+                        checkBox(LaravelFmtBundle.message("settings.format.php"))
+                            .bindSelected(projectSettings::formatPhp)
+                            .comment(LaravelFmtBundle.message("settings.format.php.comment"))
+                    }
+                    row {
+                        checkBox(LaravelFmtBundle.message("settings.format.blade"))
+                            .bindSelected(projectSettings::formatBlade)
+                    }
+                }.enabledIf(enabled.selected)
             }
 
             group(LaravelFmtBundle.message("settings.group.all.projects")) {
@@ -58,13 +75,13 @@ class LaravelFmtConfigurable(private val project: Project) : BoundConfigurable(L
 
     override fun apply() {
         val oldPath = appSettings.binaryPath
-        val oldEnabled = projectSettings.enabled
+        val oldProjectState = projectSettings.state.modificationCount
 
         super.apply()
 
         when {
             appSettings.binaryPath != oldPath -> LaravelFmtServerService.restartAll()
-            projectSettings.enabled != oldEnabled -> project.service<LaravelFmtServerService>().restartServer()
+            projectSettings.state.modificationCount != oldProjectState -> project.service<LaravelFmtServerService>().restartServer()
         }
     }
 }
