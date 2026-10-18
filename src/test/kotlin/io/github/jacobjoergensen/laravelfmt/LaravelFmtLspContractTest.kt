@@ -2,6 +2,7 @@ package io.github.jacobjoergensen.laravelfmt
 
 import org.eclipse.lsp4j.ClientCapabilities
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
+import org.eclipse.lsp4j.DidCloseTextDocumentParams
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.DocumentFormattingParams
 import org.eclipse.lsp4j.DocumentRangeFormattingParams
@@ -27,6 +28,7 @@ import org.eclipse.lsp4j.launch.LSPLauncher
 import org.eclipse.lsp4j.services.LanguageClient
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions.assumeTrue
@@ -111,6 +113,22 @@ class LaravelFmtLspContractTest {
 
         // Full sync: send the formatted text as a whole-document change, then nothing is left to do.
         change(file, 2, formatted)
+        assertEquals(emptyList<TextEdit>(), format(file))
+    }
+
+    @Test
+    fun `a file is only formatted while it is open`() {
+        initialize()
+        val file = write("app/Example.php", unformatted)
+
+        assertEquals(emptyList<TextEdit>(), format(file))
+
+        open(file, "php", unformatted)
+
+        assertNotEquals(emptyList<TextEdit>(), format(file))
+
+        server.textDocumentService.didClose(DidCloseTextDocumentParams(TextDocumentIdentifier(uri(file))))
+
         assertEquals(emptyList<TextEdit>(), format(file))
     }
 

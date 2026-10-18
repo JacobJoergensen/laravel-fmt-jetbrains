@@ -5,6 +5,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.lsp.api.LspServer
+import com.intellij.platform.lsp.api.LspServerDescriptor
 import com.intellij.platform.lsp.api.LspServerSupportProvider
 import com.intellij.platform.lsp.api.lsWidget.LspServerWidgetItem
 
@@ -16,25 +17,30 @@ import com.intellij.platform.lsp.api.lsWidget.LspServerWidgetItem
 class LaravelFmtLspServerSupportProvider : LspServerSupportProvider {
 
     override fun fileOpened(project: Project, file: VirtualFile, serverStarter: LspServerSupportProvider.LspServerStarter) {
-        val server = project.service<LaravelFmtServerService>()
-
-        if (!server.formats(file)) {
-            return
+        if (project.service<LaravelFmtServerService>().formats(file)) {
+            start(project, serverStarter::ensureServerStarted)
         }
-
-        val resolution = server.resolve()
-        val notifier = project.service<LaravelFmtNotifications>()
-
-        resolution.explicitPathMissing?.let { notifier.explicitPathMissingOnce(it, resolution.path) }
-
-        if (resolution.path == null) {
-            notifier.notFoundOnce(resolution.blockedByTrust)
-            return
-        }
-
-        serverStarter.ensureServerStarted(LaravelFmtLspServerDescriptor(project))
     }
 
     override fun createLspServerWidgetItem(lspServer: LspServer, currentFile: VirtualFile?): LspServerWidgetItem =
         LspServerWidgetItem(lspServer, currentFile, AllIcons.Actions.ReformatCode, LaravelFmtConfigurable::class.java)
+
+    companion object {
+        /** False when laravel-fmt isn't found. */
+        fun start(project: Project, ensureStarted: (LspServerDescriptor) -> Unit): Boolean {
+            val resolution = project.service<LaravelFmtServerService>().resolve()
+            val notifier = project.service<LaravelFmtNotifications>()
+
+            resolution.explicitPathMissing?.let { notifier.explicitPathMissingOnce(it, resolution.path) }
+
+            if (resolution.path == null) {
+                notifier.notFoundOnce(resolution.blockedByTrust)
+                return false
+            }
+
+            ensureStarted(LaravelFmtLspServerDescriptor(project))
+
+            return true
+        }
+    }
 }

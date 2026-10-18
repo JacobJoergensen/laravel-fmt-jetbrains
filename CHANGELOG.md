@@ -10,6 +10,7 @@
 * Fixed Reformat Code and format on save ignoring laravel-fmt's `endOfLine` setting
 * Fixed Reformat Code on a selection formatting the whole file in PhpStorm 2025.3
 * Fixed Reformat Code and format on save unfolding code that laravel-fmt didn't change
+* Fixed Reformat Code on a folder and before commit skipping files that aren't open
 
 ## Version 0.1.0 (2026-10-14)
 * Initial release
