@@ -12,6 +12,13 @@ You'll need the binary: `composer require --dev jacobjoergensen/laravel-fmt`
 
 PhpStorm 2025.3 or later, or IntelliJ IDEA Ultimate with the PHP plugin.
 
+## Usage
+
+Press Reformat Code (Ctrl+Alt+L, or ⌥⌘L on macOS) in a file, or on a folder in the Project view. From
+PhpStorm 2026.1 it also formats just a selection.
+
+To format on save, turn on Run on save in the settings below.
+
 ## How it finds laravel-fmt
 
 It checks, in order:
@@ -24,7 +31,12 @@ Untrusted projects can't run their own `vendor/bin` binary.
 
 ## Settings
 
-Settings | Tools | laravel-fmt lets you turn it off for a project or point it at a specific binary.
+Settings | Tools | laravel-fmt lets you:
+
+- turn it off for a project
+- format only PHP or only Blade, and leave the other to PhpStorm or a tool like Pint
+- run it on save
+- point it at a specific binary
 
 ## Development
 
