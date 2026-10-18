@@ -20,7 +20,7 @@ import java.io.File
 class LaravelFmtConfigurable(private val project: Project) : BoundConfigurable(LaravelFmtBundle.message("settings.display.name")) {
 
     private val projectSettings get() = project.service<LaravelFmtProjectSettings>()
-    private val appSettings get() = LaravelFmtSettings.getInstance()
+    private val appSettings get() = service<LaravelFmtSettings>()
 
     override fun createPanel(): DialogPanel {
         val descriptor = FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor()

@@ -20,7 +20,7 @@ object BinaryResolver {
     /** A drive path (`C:\`) or a UNC path (`\\server\share`). */
     private val WINDOWS_ABSOLUTE = Regex("""^([A-Za-z]:[\\/]|\\\\)""")
 
-    fun vendorBinCandidates(isWindows: Boolean): List<String> {
+    private fun vendorBinCandidates(isWindows: Boolean): List<String> {
         if (isWindows) {
             return listOf("$BASE_NAME.bat", "$BASE_NAME.cmd", "$BASE_NAME.exe", BASE_NAME)
         }
@@ -35,7 +35,7 @@ object BinaryResolver {
     fun findProjectLocal(
         roots: List<String>,
         isWindows: Boolean,
-        fileExists: (String) -> Boolean = { File(it).isFile },
+        fileExists: (String) -> Boolean = ::isFile,
         listSubdirectories: (String) -> List<String> = ::subdirectoryNames,
     ): String? {
         var level = roots.filter { it.isNotBlank() }.map { it.replace('\\', '/').trimEnd('/') }.distinct()
@@ -95,7 +95,7 @@ object BinaryResolver {
 
     fun isExplicitPathMissing(
         explicitPath: String?,
-        fileExists: (String) -> Boolean = { File(it).isFile },
+        fileExists: (String) -> Boolean = ::isFile,
     ): Boolean = explicitPath?.trim()?.let { it.isNotEmpty() && !fileExists(it) } ?: false
 
     fun resolve(
@@ -104,7 +104,7 @@ object BinaryResolver {
         isWindows: Boolean,
         allowProjectLocal: Boolean,
         pathLookup: (String) -> String?,
-        fileExists: (String) -> Boolean = { File(it).isFile },
+        fileExists: (String) -> Boolean = ::isFile,
         listSubdirectories: (String) -> List<String> = ::subdirectoryNames,
     ): String? {
         // A stale explicit path falls through to auto-detection instead of breaking a working project.
@@ -126,6 +126,8 @@ object BinaryResolver {
 
         return dir.startsWith('/')
     }
+
+    private fun isFile(path: String): Boolean = File(path).isFile
 
     private fun subdirectoryNames(dir: String): List<String> =
         File(dir).listFiles { f -> f.isDirectory }?.map { it.name }.orEmpty()

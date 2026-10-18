@@ -62,61 +62,28 @@ class BinaryResolverTest {
     }
 
     @Test
-    fun `windows vendor bin prefers the bat shim`() {
-        val result = BinaryResolver.resolve(
-            explicitPath = "",
-            projectRoots = listOf("C:/project"),
-            isWindows = true,
-            allowProjectLocal = true,
-            pathLookup = noPath,
-            fileExists = existsOnly(
-                "C:/project/vendor/bin/laravel-fmt.bat",
-                "C:/project/vendor/bin/laravel-fmt.exe",
-                "C:/project/vendor/bin/laravel-fmt",
-            ),
-        )
+    fun `windows vendor bin prefers the bat, cmd and exe shims over the bare name`() {
+        val seen = mutableListOf<String>()
 
-        assertEquals("C:/project/vendor/bin/laravel-fmt.bat", result)
-    }
-
-    @Test
-    fun `windows vendor bin falls back to exe then bare`() {
-        val exeOnly = BinaryResolver.resolve(
-            explicitPath = "",
-            projectRoots = listOf("C:/project"),
-            isWindows = true,
-            allowProjectLocal = true,
-            pathLookup = noPath,
-            fileExists = existsOnly(
-                "C:/project/vendor/bin/laravel-fmt.exe",
-                "C:/project/vendor/bin/laravel-fmt",
-            ),
-        )
-
-        assertEquals("C:/project/vendor/bin/laravel-fmt.exe", exeOnly)
-
-        val bareOnly = BinaryResolver.resolve(
-            explicitPath = "",
-            projectRoots = listOf("C:/project"),
-            isWindows = true,
-            allowProjectLocal = true,
-            pathLookup = noPath,
-            fileExists = existsOnly("C:/project/vendor/bin/laravel-fmt"),
-        )
-
-        assertEquals("C:/project/vendor/bin/laravel-fmt", bareOnly)
-    }
-
-    @Test
-    fun `windows vendor bin accepts a cmd shim`() {
-        val result = BinaryResolver.findProjectLocal(
+        BinaryResolver.findProjectLocal(
             roots = listOf("C:/project"),
             isWindows = true,
-            fileExists = existsOnly("C:/project/vendor/bin/laravel-fmt.cmd", "C:/project/vendor/bin/laravel-fmt"),
+            fileExists = {
+                seen += it
+                false
+            },
             listSubdirectories = { emptyList() },
         )
 
-        assertEquals("C:/project/vendor/bin/laravel-fmt.cmd", result)
+        assertEquals(
+            listOf(
+                "C:/project/vendor/bin/laravel-fmt.bat",
+                "C:/project/vendor/bin/laravel-fmt.cmd",
+                "C:/project/vendor/bin/laravel-fmt.exe",
+                "C:/project/vendor/bin/laravel-fmt",
+            ),
+            seen,
+        )
     }
 
     @Test
@@ -239,7 +206,7 @@ class BinaryResolverTest {
 
         BinaryResolver.findProjectLocal(
             roots = listOf("C:\\repo\\", "C:/repo", ""),
-            isWindows = true,
+            isWindows = false,
             fileExists = {
                 seen += it
                 false
@@ -247,7 +214,7 @@ class BinaryResolverTest {
             listSubdirectories = { emptyList() },
         )
 
-        assertEquals(BinaryResolver.vendorBinCandidates(true).map { "C:/repo/vendor/bin/$it" }, seen)
+        assertEquals(listOf("C:/repo/vendor/bin/laravel-fmt"), seen)
     }
 
     @Test

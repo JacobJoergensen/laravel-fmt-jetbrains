@@ -22,7 +22,7 @@ class LaravelFmtLspServerSupportProvider : LspServerSupportProvider {
         }
 
         val resolution = server.resolve()
-        val notifier = project.service<LaravelFmtBinaryNotifier>()
+        val notifier = project.service<LaravelFmtNotifications>()
 
         resolution.explicitPathMissing?.let { notifier.explicitPathMissingOnce(it, resolution.path) }
 

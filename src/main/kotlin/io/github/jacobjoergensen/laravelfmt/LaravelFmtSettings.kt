@@ -1,6 +1,5 @@
 package io.github.jacobjoergensen.laravelfmt
 
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.BaseState
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.SimplePersistentStateComponent
@@ -21,9 +20,4 @@ class LaravelFmtSettings : SimplePersistentStateComponent<LaravelFmtSettings.Sta
         set(value) {
             state.binaryPath = value
         }
-
-    companion object {
-        fun getInstance(): LaravelFmtSettings =
-            ApplicationManager.getApplication().getService(LaravelFmtSettings::class.java)
-    }
 }

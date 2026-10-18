@@ -33,7 +33,7 @@ class LaravelFmtLspServerDescriptor(project: Project) : ProjectWideLspServerDesc
         val executable = try {
             LaravelFmtLauncher.prepare(project)
         } catch (e: LaravelFmtLauncher.LaunchException) {
-            project.service<LaravelFmtBinaryNotifier>().startFailed(e.userMessage, e.details)
+            project.service<LaravelFmtNotifications>().startFailed(e.userMessage, e.details)
             throw ExecutionException(e.userMessage)
         }
 

@@ -82,7 +82,7 @@ class LaravelFmtServerService(private val project: Project) : Disposable {
     /** Safe to call from any thread. The provider starts the server again for open files if it should run. */
     fun restartServer() {
         invalidate()
-        project.service<LaravelFmtBinaryNotifier>().reset()
+        project.service<LaravelFmtNotifications>().reset()
 
         ApplicationManager.getApplication().invokeLater({
             LspServerManager.getInstance(project).stopAndRestartIfNeeded(LaravelFmtLspServerSupportProvider::class.java)
@@ -107,7 +107,7 @@ class LaravelFmtServerService(private val project: Project) : Disposable {
     }
 
     private fun compute(): Resolution {
-        val explicitPath = LaravelFmtSettings.getInstance().binaryPath
+        val explicitPath = service<LaravelFmtSettings>().binaryPath
         val trusted = TrustedProjects.isProjectTrusted(project)
         val roots = projectRoots()
 
