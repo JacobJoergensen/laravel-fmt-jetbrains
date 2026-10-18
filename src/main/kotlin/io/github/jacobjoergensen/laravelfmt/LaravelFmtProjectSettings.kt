@@ -14,17 +14,27 @@ import com.intellij.openapi.components.Storage
 @State(name = "LaravelFmtProjectSettings", storages = [Storage("laravel-fmt.xml")])
 class LaravelFmtProjectSettings : SimplePersistentStateComponent<LaravelFmtProjectSettings.State>(State()) {
 
+    enum class Mode {
+        AUTOMATIC,
+        ALWAYS,
+        OFF,
+    }
+
     class State : BaseState() {
+        var mode by enum(Mode.AUTOMATIC)
+
+        /** The on/off checkbox [mode] replaced, only read so a project switched off with it stays off. */
         var enabled by property(true)
+
         var formatPhp by property(true)
         var formatBlade by property(true)
         var formatOnSave by property(false)
     }
 
-    var enabled: Boolean
-        get() = state.enabled
+    var mode: Mode
+        get() = state.mode
         set(value) {
-            state.enabled = value
+            state.mode = value
         }
 
     var formatPhp: Boolean
@@ -44,4 +54,13 @@ class LaravelFmtProjectSettings : SimplePersistentStateComponent<LaravelFmtProje
         set(value) {
             state.formatOnSave = value
         }
+
+    override fun loadState(state: State) {
+        if (!state.enabled) {
+            state.mode = Mode.OFF
+            state.enabled = true
+        }
+
+        super.loadState(state)
+    }
 }

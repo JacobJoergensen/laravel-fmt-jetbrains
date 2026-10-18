@@ -14,6 +14,9 @@ PhpStorm 2025.3 or later, or IntelliJ IDEA Ultimate with the PHP plugin.
 
 ## Usage
 
+It turns on by itself in projects that use laravel-fmt: `composer.json` requires it, or there's a
+`laravel-fmt.json` or `vendor/bin/laravel-fmt`. Other PHP projects keep PhpStorm's formatter.
+
 Press Reformat Code (Ctrl+Alt+L, or ⌥⌘L on macOS) in a file, or on a folder in the Project view. From
 PhpStorm 2026.1 it also formats just a selection.
 
@@ -33,7 +36,7 @@ Untrusted projects can't run their own `vendor/bin` binary.
 
 Settings | Tools | laravel-fmt lets you:
 
-- turn it off for a project
+- choose when it runs: Automatic (only in projects that use laravel-fmt), Always, or Off
 - format only PHP or only Blade, and leave the other to PhpStorm or a tool like Pint
 - run it on save
 - point it at a specific binary

@@ -17,11 +17,18 @@ import com.intellij.testFramework.LightVirtualFile
 import com.intellij.testFramework.TestActionEvent
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jetbrains.php.lang.PhpFileType
+import io.github.jacobjoergensen.laravelfmt.LaravelFmtProjectSettings.Mode
 
 /** Runs in a PhpStorm test instance, for the wiring unit tests can't reach: plugin.xml, services, actions. */
 class LaravelFmtPluginTest : BasePlatformTestCase() {
 
     private val projectSettings get() = project.service<LaravelFmtProjectSettings>()
+
+    /** The test project has no `composer.json`, so automatic mode would keep laravel-fmt off. */
+    override fun setUp() {
+        super.setUp()
+        projectSettings.mode = Mode.ALWAYS
+    }
 
     override fun tearDown() {
         try {
@@ -57,8 +64,20 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
         assertTrue(formatting.shouldFormatThisFileExclusivelyByServer(php, true, false))
     }
 
+    fun `test a project that doesn't use laravel-fmt keeps the IDE formatter by default`() {
+        projectSettings.loadState(LaravelFmtProjectSettings.State())
+
+        assertFalse(LaravelFmtLspServerDescriptor(project).isSupportedFile(file("Example.php", "<?php echo 1;\n")))
+    }
+
+    fun `test a project switched off with the old checkbox stays off`() {
+        projectSettings.loadState(LaravelFmtProjectSettings.State().apply { enabled = false })
+
+        assertEquals(Mode.OFF, projectSettings.mode)
+    }
+
     fun `test server is not started when laravel-fmt is disabled for the project`() {
-        projectSettings.enabled = false
+        projectSettings.mode = Mode.OFF
 
         assertFalse(startsServerFor(file("Example.php", "<?php echo 1;\n")))
     }
@@ -84,7 +103,7 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
 
         assertTrue(updatedPresentationVisible(action))
 
-        projectSettings.enabled = false
+        projectSettings.mode = Mode.OFF
 
         assertFalse(updatedPresentationVisible(action))
     }
@@ -111,7 +130,7 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
 
         assertTrue(action.isEnabledForProject(project))
 
-        projectSettings.enabled = false
+        projectSettings.mode = Mode.OFF
 
         assertFalse(action.isEnabledForProject(project))
     }

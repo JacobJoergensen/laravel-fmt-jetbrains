@@ -28,16 +28,24 @@ object BinaryResolver {
         return listOf(BASE_NAME)
     }
 
-    /**
-     * Also searches up to [MAX_NESTING] levels below the roots, level by level, so a Laravel app in a
-     * monorepo's `apps/web/` is found.
-     */
     fun findProjectLocal(
         roots: List<String>,
         isWindows: Boolean,
         fileExists: (String) -> Boolean = ::isFile,
         listSubdirectories: (String) -> List<String> = ::subdirectoryNames,
-    ): String? {
+    ): String? = projectDirs(roots, listSubdirectories).firstNotNullOfOrNull { vendorBinIn(it, isWindows, fileExists) }
+
+    fun vendorBinIn(dir: String, isWindows: Boolean, fileExists: (String) -> Boolean = ::isFile): String? =
+        vendorBinCandidates(isWindows).map { "$dir/vendor/bin/$it" }.firstOrNull(fileExists)
+
+    /**
+     * The roots, then up to [MAX_NESTING] levels below them, level by level, so a Laravel app in a
+     * monorepo's `apps/web/` is found. Lazy, so a search that stops early lists no more folders.
+     */
+    fun projectDirs(
+        roots: List<String>,
+        listSubdirectories: (String) -> List<String> = ::subdirectoryNames,
+    ): Sequence<String> = sequence {
         var level = roots.filter { it.isNotBlank() }.map { it.replace('\\', '/').trimEnd('/') }.distinct()
 
         for (depth in 0..MAX_NESTING) {
@@ -50,16 +58,8 @@ object BinaryResolver {
                 }
             }
 
-            val found = level.firstNotNullOfOrNull { dir ->
-                vendorBinCandidates(isWindows).map { "$dir/vendor/bin/$it" }.firstOrNull(fileExists)
-            }
-
-            if (found != null) {
-                return found
-            }
+            yieldAll(level)
         }
-
-        return null
     }
 
     /**
@@ -127,8 +127,8 @@ object BinaryResolver {
         return dir.startsWith('/')
     }
 
-    private fun isFile(path: String): Boolean = File(path).isFile
+    internal fun isFile(path: String): Boolean = File(path).isFile
 
-    private fun subdirectoryNames(dir: String): List<String> =
+    internal fun subdirectoryNames(dir: String): List<String> =
         File(dir).listFiles { f -> f.isDirectory }?.map { it.name }.orEmpty()
 }

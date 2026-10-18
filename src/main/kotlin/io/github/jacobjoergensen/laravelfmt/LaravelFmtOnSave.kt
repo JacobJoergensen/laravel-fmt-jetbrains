@@ -25,7 +25,7 @@ import com.intellij.psi.PsiDocumentManager
 class LaravelFmtOnSaveAction : ActionsOnSaveFileDocumentManagerListener.ActionOnSave() {
 
     override fun isEnabledForProject(project: Project): Boolean =
-        project.service<LaravelFmtProjectSettings>().let { it.enabled && it.formatOnSave }
+        project.service<LaravelFmtProjectSettings>().formatOnSave && project.service<LaravelFmtServerService>().isEnabled
 
     override fun processDocuments(project: Project, documents: Array<Document>) {
         // The same guard as the IDE's own Reformat code save action.
@@ -83,10 +83,10 @@ private class LaravelFmtOnSaveInfo(context: ActionOnSaveContext) :
 
     override fun getActionOnSaveName(): String = LaravelFmtBundle.message("save.action.name")
 
-    override fun isApplicableAccordingToStoredState(): Boolean = settings.enabled
+    override fun isApplicableAccordingToStoredState(): Boolean = settings.mode != LaravelFmtProjectSettings.Mode.OFF
 
     override fun isApplicableAccordingToUiState(configurable: LaravelFmtConfigurable): Boolean =
-        configurable.enabledCheckBox.isSelected
+        !configurable.offRadioButton.isSelected
 
     override fun isActionOnSaveEnabledAccordingToStoredState(): Boolean = settings.formatOnSave
 
@@ -97,10 +97,10 @@ private class LaravelFmtOnSaveInfo(context: ActionOnSaveContext) :
         configurable.formatOnSaveCheckBox.isSelected = enabled
     }
 
-    override fun getCommentAccordingToStoredState(): ActionOnSaveComment? = disabledComment(settings.enabled)
+    override fun getCommentAccordingToStoredState(): ActionOnSaveComment? = disabledComment(isApplicableAccordingToStoredState())
 
     override fun getCommentAccordingToUiState(configurable: LaravelFmtConfigurable): ActionOnSaveComment? =
-        disabledComment(configurable.enabledCheckBox.isSelected)
+        disabledComment(isApplicableAccordingToUiState(configurable))
 
     override fun getActionLinks() = listOf(createGoToPageInSettingsLink(LaravelFmtConfigurable.ID))
 

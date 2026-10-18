@@ -80,7 +80,7 @@ class LaravelFmtNotifications(private val project: Project) {
     /** For projects that don't use laravel-fmt at all. */
     private fun disableForProjectAction(): NotificationAction =
         NotificationAction.createSimpleExpiring(LaravelFmtBundle.message("notification.action.disable.project")) {
-            project.service<LaravelFmtProjectSettings>().enabled = false
+            project.service<LaravelFmtProjectSettings>().mode = LaravelFmtProjectSettings.Mode.OFF
             project.service<LaravelFmtServerService>().restartServer()
         }
 

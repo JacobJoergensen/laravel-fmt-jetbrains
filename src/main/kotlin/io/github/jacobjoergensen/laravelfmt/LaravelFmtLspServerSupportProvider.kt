@@ -9,8 +9,9 @@ import com.intellij.platform.lsp.api.LspServerSupportProvider
 import com.intellij.platform.lsp.api.lsWidget.LspServerWidgetItem
 
 /**
- * Doesn't start the server when laravel-fmt is off or not found, so the user gets a notification instead
- * of a server error. The IDE calls [fileOpened] for every opened file, so the binary lookup is cached.
+ * Doesn't start the server when laravel-fmt is off, unused by the project or not found. Only the last one
+ * gets a notification, instead of a server error. The IDE calls [fileOpened] for every opened file, so
+ * the lookups are cached.
  */
 class LaravelFmtLspServerSupportProvider : LspServerSupportProvider {
 

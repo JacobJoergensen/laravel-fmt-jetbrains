@@ -40,7 +40,7 @@
 
     <projectListeners>
         <listener
-            class="io.github.jacobjoergensen.laravelfmt.LaravelFmtVendorListener"
+            class="io.github.jacobjoergensen.laravelfmt.LaravelFmtSetupListener"
             topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
     </projectListeners>
 </idea-plugin>
