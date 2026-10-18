@@ -22,6 +22,10 @@ class LaravelFmtConfigurable(private val project: Project) : BoundConfigurable(L
     private val projectSettings get() = project.service<LaravelFmtProjectSettings>()
     private val appSettings get() = service<LaravelFmtSettings>()
 
+    /** Read and set by the laravel-fmt row on the Actions on Save page while both pages are open. */
+    internal lateinit var enabledCheckBox: JBCheckBox
+    internal lateinit var formatOnSaveCheckBox: JBCheckBox
+
     override fun createPanel(): DialogPanel {
         val descriptor = FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor()
             .withTitle(LaravelFmtBundle.message("settings.binary.chooser.title"))
@@ -40,6 +44,8 @@ class LaravelFmtConfigurable(private val project: Project) : BoundConfigurable(L
                         .bindSelected(projectSettings::enabled)
                 }
 
+                enabledCheckBox = enabled.component
+
                 indent {
                     row {
                         checkBox(LaravelFmtBundle.message("settings.format.php"))
@@ -49,6 +55,12 @@ class LaravelFmtConfigurable(private val project: Project) : BoundConfigurable(L
                     row {
                         checkBox(LaravelFmtBundle.message("settings.format.blade"))
                             .bindSelected(projectSettings::formatBlade)
+                    }
+                    row {
+                        formatOnSaveCheckBox = checkBox(LaravelFmtBundle.message("settings.format.on.save"))
+                            .bindSelected(projectSettings::formatOnSave)
+                            .comment(LaravelFmtBundle.message("settings.format.on.save.comment"))
+                            .component
                     }
                 }.enabledIf(enabled.selected)
             }
@@ -75,13 +87,20 @@ class LaravelFmtConfigurable(private val project: Project) : BoundConfigurable(L
 
     override fun apply() {
         val oldPath = appSettings.binaryPath
-        val oldProjectState = projectSettings.state.modificationCount
+        val oldServerInputs = serverInputs()
 
         super.apply()
 
         when {
             appSettings.binaryPath != oldPath -> LaravelFmtServerService.restartAll()
-            projectSettings.state.modificationCount != oldProjectState -> project.service<LaravelFmtServerService>().restartServer()
+            serverInputs() != oldServerInputs -> project.service<LaravelFmtServerService>().restartServer()
         }
+    }
+
+    /** Run on save is left out: the server doesn't depend on it, so toggling it needs no restart. */
+    private fun serverInputs() = listOf(projectSettings.enabled, projectSettings.formatPhp, projectSettings.formatBlade)
+
+    companion object {
+        const val ID = "io.github.jacobjoergensen.laravelfmt.settings"
     }
 }

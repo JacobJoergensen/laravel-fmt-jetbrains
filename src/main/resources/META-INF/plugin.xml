@@ -15,6 +15,11 @@
             key="settings.display.name"
             instance="io.github.jacobjoergensen.laravelfmt.LaravelFmtConfigurable"/>
         <notificationGroup id="laravel-fmt" displayType="BALLOON" key="notification.group.name"/>
+        <actionOnSaveInfoProvider
+            id="LaravelFmtOnSaveInfoProvider"
+            implementation="io.github.jacobjoergensen.laravelfmt.LaravelFmtOnSaveInfoProvider"
+            order="after FormatOnSaveInfoProvider"/>
+        <actionOnSave id="LaravelFmtOnSaveAction" implementation="io.github.jacobjoergensen.laravelfmt.LaravelFmtOnSaveAction"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.intellij.platform.lsp">

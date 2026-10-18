@@ -1,5 +1,7 @@
 package io.github.jacobjoergensen.laravelfmt
 
+import com.intellij.codeInsight.actions.onSave.FormatOnSaveOptions
+import com.intellij.ide.actionsOnSave.ActionOnSaveInfoProvider
 import com.intellij.notification.NotificationDisplayType
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.openapi.actionSystem.ActionManager
@@ -11,8 +13,10 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.lsp.api.LspServerDescriptor
 import com.intellij.platform.lsp.api.LspServerSupportProvider
 import com.intellij.platform.lsp.api.customization.LspFormattingSupport
+import com.intellij.testFramework.LightVirtualFile
 import com.intellij.testFramework.TestActionEvent
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.jetbrains.php.lang.PhpFileType
 
 /** Runs in a PhpStorm test instance, for the wiring unit tests can't reach: plugin.xml, services, actions. */
 class LaravelFmtPluginTest : BasePlatformTestCase() {
@@ -22,6 +26,7 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
     override fun tearDown() {
         try {
             projectSettings.loadState(LaravelFmtProjectSettings.State())
+            FormatOnSaveOptions.getInstance(project).isRunOnSaveEnabled = false
         } finally {
             super.tearDown()
         }
@@ -91,9 +96,44 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
         assertFalse(updatedPresentationVisible(LaravelFmtRestartAction()))
     }
 
+    fun `test Run laravel-fmt is listed on the Actions on Save page`() {
+        val providers = ExtensionPointName<ActionOnSaveInfoProvider>("com.intellij.actionOnSaveInfoProvider").extensionList
+
+        assertTrue(providers.any { it is LaravelFmtOnSaveInfoProvider })
+    }
+
+    fun `test formatting on save needs both laravel-fmt and Run on save turned on`() {
+        val action = LaravelFmtOnSaveAction()
+
+        assertFalse(action.isEnabledForProject(project))
+
+        projectSettings.formatOnSave = true
+
+        assertTrue(action.isEnabledForProject(project))
+
+        projectSettings.enabled = false
+
+        assertFalse(action.isEnabledForProject(project))
+    }
+
+    fun `test saving a file outside the project does not format it`() {
+        val outside = LightVirtualFile("Outside.php", PhpFileType.INSTANCE, "<?php echo 1;\n")
+
+        assertTrue(LaravelFmtOnSaveAction.formatsOnSave(project, file("Example.php", "<?php echo 1;\n")))
+        assertFalse(LaravelFmtOnSaveAction.formatsOnSave(project, outside))
+    }
+
+    fun `test files the IDE's Reformat code save action covers are not formatted twice on save`() {
+        val php = file("Example.php", "<?php echo 1;\n")
+
+        FormatOnSaveOptions.getInstance(project).isRunOnSaveEnabled = true
+
+        assertFalse(LaravelFmtOnSaveAction.formatsOnSave(project, php))
+    }
+
     fun `test settings page shows its name`() {
         val settings = Configurable.PROJECT_CONFIGURABLE.getExtensions(project)
-            .single { it.id == "io.github.jacobjoergensen.laravelfmt.settings" }
+            .single { it.id == LaravelFmtConfigurable.ID }
 
         assertEquals("laravel-fmt", settings.getDisplayName())
     }

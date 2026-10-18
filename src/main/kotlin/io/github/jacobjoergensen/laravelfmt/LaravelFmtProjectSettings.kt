@@ -18,6 +18,7 @@ class LaravelFmtProjectSettings : SimplePersistentStateComponent<LaravelFmtProje
         var enabled by property(true)
         var formatPhp by property(true)
         var formatBlade by property(true)
+        var formatOnSave by property(false)
     }
 
     var enabled: Boolean
@@ -36,5 +37,11 @@ class LaravelFmtProjectSettings : SimplePersistentStateComponent<LaravelFmtProje
         get() = state.formatBlade
         set(value) {
             state.formatBlade = value
+        }
+
+    var formatOnSave: Boolean
+        get() = state.formatOnSave
+        set(value) {
+            state.formatOnSave = value
         }
 }
