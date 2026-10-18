@@ -15,6 +15,7 @@
             key="settings.display.name"
             instance="io.github.jacobjoergensen.laravelfmt.LaravelFmtConfigurable"/>
         <notificationGroup id="laravel-fmt" displayType="BALLOON" key="notification.group.name"/>
+        <postStartupActivity implementation="io.github.jacobjoergensen.laravelfmt.LaravelFmtStartupActivity"/>
         <formattingService implementation="io.github.jacobjoergensen.laravelfmt.LaravelFmtFormattingService" order="first"/>
         <documentMerger implementation="io.github.jacobjoergensen.laravelfmt.LaravelFmtDocumentMerger"/>
         <actionOnSaveInfoProvider

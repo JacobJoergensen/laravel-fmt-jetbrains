@@ -257,7 +257,7 @@ class LaravelFmtLspContractTest {
         return output
     }
 
-    private fun apply(text: String, edits: List<TextEdit>): String = LaravelFmtFormattingService.applyEdits(text, edits)
+    private fun apply(text: String, edits: List<TextEdit>): String = LspTextEdits.applyEdits(text, edits)
 
     /** Keeps the messages the server sends; the IDE shows `showMessage` as a balloon and only logs `logMessage`. */
     private class RecordingClient : LanguageClient {

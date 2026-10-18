@@ -20,7 +20,7 @@ class LaravelFmtDocumentMergerTest : BasePlatformTestCase() {
         TextEdit(Range(Position(3, 0), Position(4, 0)), "\$y = 2;\n"),
     )
 
-    private val formatted = LaravelFmtFormattingService.applyEdits(unformatted, edits)
+    private val formatted = LspTextEdits.applyEdits(unformatted, edits)
 
     fun `test a fold on a line laravel-fmt didn't change survives formatting`() {
         val document = configure()
@@ -69,7 +69,7 @@ class LaravelFmtDocumentMergerTest : BasePlatformTestCase() {
     }
 
     private fun expectFormat(document: Document) {
-        val replacements = LaravelFmtFormattingService.replacements(unformatted, edits)
+        val replacements = LspTextEdits.replacements(unformatted, edits)
 
         document.putUserData(LaravelFmtDocumentMerger.PENDING, LaravelFmtDocumentMerger.Pending(document.modificationStamp, formatted, replacements))
     }

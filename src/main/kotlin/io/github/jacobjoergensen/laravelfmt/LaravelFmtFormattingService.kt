@@ -10,8 +10,6 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.TextRange
-import com.intellij.openapi.util.text.StringUtil
 import com.intellij.platform.lsp.api.LspServer
 import com.intellij.platform.lsp.api.LspServerManager
 import com.intellij.platform.lsp.api.LspServerState
@@ -21,7 +19,6 @@ import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.DocumentFormattingParams
 import org.eclipse.lsp4j.DocumentRangeFormattingParams
 import org.eclipse.lsp4j.FormattingOptions
-import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.TextDocumentIdentifier
 import org.eclipse.lsp4j.TextDocumentItem
@@ -58,7 +55,7 @@ class LaravelFmtFormattingService : AsyncDocumentFormattingService() {
         val document = FileDocumentManager.getInstance().getCachedDocument(file)
         val stamp = document?.modificationStamp ?: 0
         val text = request.documentText
-        val ranges = lspRanges(text, request.formattingRanges)
+        val ranges = LspTextEdits.lspRanges(text, request.formattingRanges)
         val settings = context.codeStyleSettings
         val options = FormattingOptions(settings.getIndentSize(file.fileType), !settings.useTabCharacter(file.fileType))
 
@@ -88,8 +85,8 @@ class LaravelFmtFormattingService : AsyncDocumentFormattingService() {
                     }
                 }
 
-                val replacements = edits?.let { replacements(text, it) }
-                val formatted = replacements?.let { apply(text, it) }
+                val replacements = edits?.let { LspTextEdits.replacements(text, it) }
+                val formatted = replacements?.let { LspTextEdits.apply(text, it) }
 
                 if (replacements != null && formatted != null) {
                     document?.putUserData(LaravelFmtDocumentMerger.PENDING, LaravelFmtDocumentMerger.Pending(stamp, formatted, replacements))
@@ -137,7 +134,7 @@ class LaravelFmtFormattingService : AsyncDocumentFormattingService() {
                     } ?: return null
                 }
 
-                return edits.distinct().takeUnless(::overlapping)
+                return edits.distinct().takeUnless(LspTextEdits::overlapping)
             }
 
             override fun cancel(): Boolean {
@@ -155,8 +152,6 @@ class LaravelFmtFormattingService : AsyncDocumentFormattingService() {
 
     override fun getName(): String = LaravelFmtBundle.message("settings.display.name")
 
-    data class Replacement(val start: Int, val end: Int, val text: String)
-
     companion object {
         /** Under the 30 seconds after which the formatting framework reports a timeout of its own. */
         private const val FORMAT_TIMEOUT_MS = 25_000
@@ -169,50 +164,5 @@ class LaravelFmtFormattingService : AsyncDocumentFormattingService() {
 
         private fun servers(project: Project): Collection<LspServer> =
             LspServerManager.getInstance(project).getServersForProvider(LaravelFmtLspServerSupportProvider::class.java)
-
-        fun applyEdits(text: String, edits: List<TextEdit>): String = apply(text, replacements(text, edits))
-
-        /** Last first, so earlier offsets stay valid. LSP positions count UTF-16 units, the same as Java string offsets. */
-        fun replacements(text: String, edits: List<TextEdit>): List<Replacement> {
-            val lineStarts = lineStarts(text)
-
-            fun offset(position: Position): Int =
-                (lineStarts.getOrElse(position.line) { text.length } + position.character).coerceAtMost(text.length)
-
-            return edits.sortedWith(byStart).asReversed().map {
-                Replacement(offset(it.range.start), offset(it.range.end), StringUtil.convertLineSeparators(it.newText))
-            }
-        }
-
-        private fun apply(text: String, replacements: List<Replacement>): String =
-            StringBuilder(text).apply { replacements.forEach { replace(it.start, it.end, it.text) } }.toString()
-
-        private val byPosition = compareBy<Position>({ it.line }, { it.character })
-
-        private val byStart = compareBy<TextEdit, Position>(byPosition) { it.range.start }
-
-        /** Two ranges can split the same change differently, and applying both would garble it. */
-        fun overlapping(edits: List<TextEdit>): Boolean =
-            edits.sortedWith(byStart).zipWithNext().any { (a, b) ->
-                a.range.start == b.range.start || byPosition.compare(b.range.start, a.range.end) < 0
-            }
-
-        /** Null for the whole file. */
-        fun lspRanges(text: String, ranges: List<TextRange>): List<Range>? {
-            if (ranges.isEmpty() || ranges.singleOrNull() == TextRange(0, text.length)) return null
-
-            val lineStarts = lineStarts(text)
-
-            fun position(offset: Int): Position {
-                val line = lineStarts.indexOfLast { it <= offset }
-
-                return Position(line, offset - lineStarts[line])
-            }
-
-            return ranges.map { Range(position(it.startOffset), position(it.endOffset)) }
-        }
-
-        private fun lineStarts(text: String): List<Int> =
-            listOf(0) + text.indices.filter { text[it] == '\n' }.map { it + 1 }
     }
 }

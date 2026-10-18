@@ -20,7 +20,7 @@ class LaravelFmtDocumentMerger : DocumentMerger {
         return true
     }
 
-    data class Pending(val stamp: Long, val text: String, val replacements: List<LaravelFmtFormattingService.Replacement>)
+    data class Pending(val stamp: Long, val text: String, val replacements: List<LspTextEdits.Replacement>)
 
     companion object {
         val PENDING = Key.create<Pending>("laravel-fmt.pending")
