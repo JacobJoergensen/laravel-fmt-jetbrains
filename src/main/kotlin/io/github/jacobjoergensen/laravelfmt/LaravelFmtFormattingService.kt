@@ -6,6 +6,7 @@ import com.intellij.formatting.service.AsyncFormattingRequest
 import com.intellij.formatting.service.FormattingService
 import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.Document
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.util.text.StringUtil
@@ -39,6 +40,8 @@ class LaravelFmtFormattingService : AsyncDocumentFormattingService() {
         val context = request.context
         val file = context.virtualFile ?: return null
         val server = runningServer(context.project) ?: return null
+        val document = FileDocumentManager.getInstance().getCachedDocument(file)
+        val stamp = document?.modificationStamp ?: 0
         val text = request.documentText
         val ranges = lspRanges(text, request.formattingRanges)
         val settings = context.codeStyleSettings
@@ -49,35 +52,42 @@ class LaravelFmtFormattingService : AsyncDocumentFormattingService() {
             private var cancelled = false
 
             override fun run() {
-                val document = server.getDocumentIdentifier(file)
+                val textDocument = server.getDocumentIdentifier(file)
 
                 val edits = if (ranges == null) {
-                    server.sendRequestSync(FORMAT_TIMEOUT_MS) { it.textDocumentService.formatting(DocumentFormattingParams(document, options)) }
+                    server.sendRequestSync(FORMAT_TIMEOUT_MS) { it.textDocumentService.formatting(DocumentFormattingParams(textDocument, options)) }
                 } else {
-                    rangeEdits(document, ranges)
+                    rangeEdits(textDocument, ranges)
                 }
 
-                request.onTextReady(edits?.let { applyEdits(text, it) })
+                val replacements = edits?.let { replacements(text, it) }
+                val formatted = replacements?.let { apply(text, it) }
+
+                if (replacements != null && formatted != null) {
+                    document?.putUserData(LaravelFmtDocumentMerger.PENDING, LaravelFmtDocumentMerger.Pending(stamp, formatted, replacements))
+                }
+
+                request.onTextReady(formatted)
 
                 // Null when the request failed or timed out.
                 if (ranges == null && edits != null && !cancelled) {
                     context.project.service<LaravelFmtLineEndings>().afterFormat(file) {
                         server.sendRequestSync(END_OF_LINE_TIMEOUT_MS) { lsp ->
-                            (lsp as LaravelFmtLanguageServer).endOfLine(LaravelFmtLanguageServer.EndOfLineParams(document))
+                            (lsp as LaravelFmtLanguageServer).endOfLine(LaravelFmtLanguageServer.EndOfLineParams(textDocument))
                         }
                     }
                 }
             }
 
             // A change two ranges touch comes back from both.
-            private fun rangeEdits(document: TextDocumentIdentifier, ranges: List<Range>): List<TextEdit>? {
+            private fun rangeEdits(textDocument: TextDocumentIdentifier, ranges: List<Range>): List<TextEdit>? {
                 val edits = mutableListOf<TextEdit>()
 
                 for (range in ranges) {
                     if (cancelled) return null
 
                     edits += server.sendRequestSync(FORMAT_TIMEOUT_MS) {
-                        it.textDocumentService.rangeFormatting(DocumentRangeFormattingParams(document, options, range))
+                        it.textDocumentService.rangeFormatting(DocumentRangeFormattingParams(textDocument, options, range))
                     } ?: return null
                 }
 
@@ -99,6 +109,8 @@ class LaravelFmtFormattingService : AsyncDocumentFormattingService() {
 
     override fun getName(): String = LaravelFmtBundle.message("settings.display.name")
 
+    data class Replacement(val start: Int, val end: Int, val text: String)
+
     companion object {
         /** Under the 30 seconds after which the formatting framework reports a timeout of its own. */
         private const val FORMAT_TIMEOUT_MS = 25_000
@@ -109,21 +121,22 @@ class LaravelFmtFormattingService : AsyncDocumentFormattingService() {
             LspServerManager.getInstance(project).getServersForProvider(LaravelFmtLspServerSupportProvider::class.java)
                 .firstOrNull { it.state == LspServerState.Running || it.state == LspServerState.Initializing }
 
-        /** LSP positions count UTF-16 units, the same as Java string offsets. */
-        fun applyEdits(text: String, edits: List<TextEdit>): String {
+        fun applyEdits(text: String, edits: List<TextEdit>): String = apply(text, replacements(text, edits))
+
+        /** Last first, so earlier offsets stay valid. LSP positions count UTF-16 units, the same as Java string offsets. */
+        fun replacements(text: String, edits: List<TextEdit>): List<Replacement> {
             val lineStarts = lineStarts(text)
 
             fun offset(position: Position): Int =
                 (lineStarts.getOrElse(position.line) { text.length } + position.character).coerceAtMost(text.length)
 
-            val result = StringBuilder(text)
-
-            edits.sortedWith(byStart).asReversed().forEach {
-                result.replace(offset(it.range.start), offset(it.range.end), StringUtil.convertLineSeparators(it.newText))
+            return edits.sortedWith(byStart).asReversed().map {
+                Replacement(offset(it.range.start), offset(it.range.end), StringUtil.convertLineSeparators(it.newText))
             }
-
-            return result.toString()
         }
+
+        private fun apply(text: String, replacements: List<Replacement>): String =
+            StringBuilder(text).apply { replacements.forEach { replace(it.start, it.end, it.text) } }.toString()
 
         private val byPosition = compareBy<Position>({ it.line }, { it.character })
 
