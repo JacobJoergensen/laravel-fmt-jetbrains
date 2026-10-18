@@ -17,8 +17,8 @@ PhpStorm 2025.3 or later, or IntelliJ IDEA Ultimate with the PHP plugin.
 It turns on by itself in projects that use laravel-fmt: `composer.json` requires it, or there's a
 `laravel-fmt.json` or `vendor/bin/laravel-fmt`. Other PHP projects keep PhpStorm's formatter.
 
-Press Reformat Code (Ctrl+Alt+L, or ⌥⌘L on macOS) in a file, or on a folder in the Project view. From
-PhpStorm 2026.1 it also formats just a selection.
+Press Reformat Code (Ctrl+Alt+L, or ⌥⌘L on macOS) in a file, on a selection, or on a folder in the
+Project view.
 
 To format on save, turn on Run on save in the settings below.
 
