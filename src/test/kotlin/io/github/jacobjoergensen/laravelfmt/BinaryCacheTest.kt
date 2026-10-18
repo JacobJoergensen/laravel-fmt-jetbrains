@@ -6,7 +6,9 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Clock
@@ -78,6 +80,32 @@ class BinaryCacheTest {
         assertNotEquals(old.parent, new.parent)
         assertTrue(Files.exists(new))
         assertFalse(Files.exists(old))
+    }
+
+    @Test
+    fun `a release is downloaded only the first time`() {
+        val cache = BinaryCache(temp.resolve("cache"))
+        var downloads = 0
+        val download = {
+            downloads++
+            "v1".toByteArray()
+        }
+
+        val first = cache.release("release-0.3.0_Linux_x86_64", "laravel-fmt", download)
+        val second = cache.release("release-0.3.0_Linux_x86_64", "laravel-fmt", download)
+
+        assertEquals(first, second)
+        assertEquals("v1", Files.readString(first))
+        assertEquals(1, downloads)
+    }
+
+    @Test
+    fun `a failed download leaves no binary, so the next start tries again`() {
+        val cache = BinaryCache(temp.resolve("cache"))
+
+        assertThrows<IOException> { cache.release("release-0.3.0_Linux_x86_64", "laravel-fmt") { throw IOException("offline") } }
+
+        assertFalse(Files.exists(temp.resolve("cache/release-0.3.0_Linux_x86_64/laravel-fmt")))
     }
 
     @Test

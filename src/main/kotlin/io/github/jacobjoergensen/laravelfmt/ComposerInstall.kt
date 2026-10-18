@@ -53,6 +53,20 @@ object ComposerInstall {
         return null
     }
 
+    fun installedVersionsFile(nativeBinary: String): String =
+        nativeBinary.replace('\\', '/').substringBefore("/$PACKAGE/") + "/composer/installed.php"
+
+    /**
+     * Read where the wrapper's `InstalledVersions::getPrettyVersion()` reads it. The project's own file names
+     * it, and it ends up in a download URL and a cache folder name, so only a release number is accepted.
+     */
+    fun installedVersion(installedPhp: String): String? =
+        INSTALLED_VERSION.find(installedPhp)?.groupValues?.get(1)?.takeIf { RELEASE.matches(it) && "dev" !in it }
+
+    private val INSTALLED_VERSION = Regex("""'${Regex.escape(PACKAGE)}'\s*=>\s*array\(\s*'pretty_version'\s*=>\s*'([^']+)'""")
+
+    private val RELEASE = Regex("""v?\d+(\.\d+)*([-+][0-9A-Za-z.-]+)?""")
+
     enum class Os(val composerName: String) {
         WINDOWS("Windows"), MAC("Darwin"), LINUX("Linux")
     }

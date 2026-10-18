@@ -14,9 +14,9 @@ import java.time.Duration
 import java.util.HexFormat
 
 /**
- * Copies of the native laravel-fmt binary, keyed by SHA-256, so the server never runs the file under
- * `vendor/`. Windows locks a running executable, which would make `composer update` fail while the
- * IDE is open.
+ * Native laravel-fmt binaries the server runs: copies of the one under `vendor/`, and downloaded releases.
+ * The server never runs the file under `vendor/` itself, since Windows locks a running executable, which
+ * would make `composer update` fail while the IDE is open.
  */
 class BinaryCache(private val root: Path, private val clock: Clock = Clock.systemUTC()) {
 
@@ -24,29 +24,44 @@ class BinaryCache(private val root: Path, private val clock: Clock = Clock.syste
         val hash = sha256(source)
         val dir = root.resolve(hash.take(HASH_PREFIX_LENGTH))
         val target = dir.resolve(source.fileName.toString())
+        val isIntact = { Files.isRegularFile(target) && sha256(target) == hash }
 
-        if (!Files.isRegularFile(target) || sha256(target) != hash) {
-            Files.createDirectories(dir)
-
-            // Copy under a temp name first, so nothing ever runs a half-written executable.
-            val temp = Files.createTempFile(dir, "partial-", ".tmp")
-
-            try {
-                Files.copy(source, temp, StandardCopyOption.REPLACE_EXISTING)
-                temp.toFile().setExecutable(true, true)
-                moveIntoPlace(temp, target, hash)
-            } finally {
-                Files.deleteIfExists(temp)
-            }
+        if (!isIntact()) {
+            install(target, isIntact) { Files.copy(source, it, StandardCopyOption.REPLACE_EXISTING) }
         }
 
-        Files.setLastModifiedTime(dir, FileTime.from(clock.instant()))
-        pruneUnused()
-
-        return target
+        return markUsed(target)
     }
 
-    private fun moveIntoPlace(temp: Path, target: Path, hash: String) {
+    /** Unlike [materialize], not hashed again on later use: the checksum was verified on download. */
+    fun release(key: String, binaryName: String, download: () -> ByteArray): Path {
+        val target = root.resolve(key).resolve(binaryName)
+        val isIntact = { Files.isRegularFile(target) }
+
+        if (!isIntact()) {
+            val binary = download()
+
+            install(target, isIntact) { Files.write(it, binary) }
+        }
+
+        return markUsed(target)
+    }
+
+    /** Writes under a temp name first, so nothing ever runs a half-written executable. */
+    private fun install(target: Path, isIntact: () -> Boolean, write: (Path) -> Unit) {
+        val dir = Files.createDirectories(target.parent)
+        val temp = Files.createTempFile(dir, "partial-", ".tmp")
+
+        try {
+            write(temp)
+            temp.toFile().setExecutable(true, true)
+            moveIntoPlace(temp, target, isIntact)
+        } finally {
+            Files.deleteIfExists(temp)
+        }
+    }
+
+    private fun moveIntoPlace(temp: Path, target: Path, isIntact: () -> Boolean) {
         try {
             try {
                 Files.move(temp, target, StandardCopyOption.ATOMIC_MOVE)
@@ -56,10 +71,17 @@ class BinaryCache(private val root: Path, private val clock: Clock = Clock.syste
         } catch (e: IOException) {
             // Another project put the same version in place first and may already be running it, which
             // Windows won't let us replace. Its copy is identical, so use that one.
-            if (!Files.isRegularFile(target) || sha256(target) != hash) {
+            if (!isIntact()) {
                 throw e
             }
         }
+    }
+
+    private fun markUsed(target: Path): Path {
+        Files.setLastModifiedTime(target.parent, FileTime.from(clock.instant()))
+        pruneUnused()
+
+        return target
     }
 
     /**

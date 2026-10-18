@@ -27,10 +27,10 @@ To format on save, turn on Run on save in the settings below.
 It checks, in order:
 
 1. the path in Settings | Tools | laravel-fmt
-2. `vendor/bin/laravel-fmt`, including subfolders if you're in a monorepo
+2. `vendor/bin/laravel-fmt`, including subfolders in a monorepo (trusted projects only)
 3. your `PATH`
 
-Untrusted projects can't run their own `vendor/bin` binary.
+If Composer ran in Sail or WSL, it downloads the same version for your system once. No PHP needed.
 
 ## Settings
 

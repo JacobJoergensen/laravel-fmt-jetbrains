@@ -1,7 +1,5 @@
 package io.github.jacobjoergensen.laravelfmt
 
-import com.intellij.execution.configurations.GeneralCommandLine
-import com.intellij.execution.process.CapturingProcessHandler
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
@@ -10,9 +8,11 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.SystemInfo
+import com.intellij.util.io.HttpRequests
+import com.intellij.util.io.RequestBuilder
 import com.intellij.util.system.CpuArch
 import java.io.File
-import java.nio.charset.StandardCharsets
+import java.io.IOException
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
@@ -21,8 +21,8 @@ import java.util.concurrent.TimeoutException
 
 /**
  * When the binary resolves to the Composer wrapper (`vendor/bin/laravel-fmt`, a PHP script), runs the
- * native binary it downloads instead, from a [BinaryCache] copy. Running the wrapper as the server
- * would need `php` on the IDE's PATH, add a PHP process, and lock an `.exe` under `vendor/` on Windows.
+ * native binary for this system instead, from the [BinaryCache]. Running the wrapper as the server would
+ * need `php` on the IDE's PATH, add a PHP process, and lock an `.exe` under `vendor/` on Windows.
  *
  * Called on a pooled thread, so blocking here is fine.
  */
@@ -39,39 +39,42 @@ object LaravelFmtLauncher {
         val resolved = project.service<LaravelFmtServerService>().resolve(refresh = true).path
             ?: throw LaunchException(LaravelFmtBundle.message("launch.not.found"))
 
+        val os = currentOs()
+        // No release is built for other CPUs, so there is nothing better to run.
+        val arch = currentArch() ?: return resolved
+
         // Not a Composer install (explicit path or PATH), so it is the native binary already.
-        val native = ComposerInstall.nativeBinary(resolved, currentOs(), currentArch())
-            ?: return resolved
+        val native = ComposerInstall.nativeBinary(resolved, os, arch) ?: return resolved
 
-        if (!File(native).isFile) {
-            downloadViaWrapper(project, resolved)
-
-            if (!File(native).isFile) {
-                // E.g. the IDE's JVM and PHP report different architectures, so the wrapper cached the
-                // binary under another name. The wrapper itself still works as a server.
-                LOG.warn("laravel-fmt wrapper did not produce $native; running the wrapper directly")
-                return resolved
+        if (File(native).isFile) {
+            return try {
+                BinaryCache(cacheRoot()).materialize(Path.of(native)).toString()
+            } catch (e: Exception) {
+                // Running the vendor copy directly still works; it only risks locking it on Windows.
+                LOG.warn("Could not copy $native into the laravel-fmt binary cache; running it in place", e)
+                native
             }
         }
 
+        // Composer ran on another system, such as Sail or WSL, or the wrapper never ran here.
+        val release = LaravelFmtRelease(installedVersion(native), os, arch)
+
         return try {
-            BinaryCache(cacheRoot()).materialize(Path.of(native)).toString()
-        } catch (e: Exception) {
-            // Running the vendor copy directly still works; it only risks locking it on Windows.
-            LOG.warn("Could not copy $native into the laravel-fmt binary cache; running it in place", e)
-            native
+            BinaryCache(cacheRoot()).release(release.cacheKey, release.binaryName) { download(project, release) }.toString()
+        } catch (e: IOException) {
+            throw LaunchException(LaravelFmtBundle.message("launch.download.failed"), e.message)
         }
     }
 
-    /** Runs the wrapper once with `--version`, which makes it download the native binary. */
-    private fun downloadViaWrapper(project: Project, wrapper: String) {
-        val commandLine = GeneralCommandLine(wrapper, "--version")
-            .withCharset(StandardCharsets.UTF_8)
-            .withParentEnvironmentType(GeneralCommandLine.ParentEnvironmentType.CONSOLE)
+    private fun installedVersion(native: String): String {
+        val installedPhp = runCatching { File(ComposerInstall.installedVersionsFile(native)).readText() }.getOrNull()
 
-        project.basePath?.let { commandLine.withWorkDirectory(it) }
+        return installedPhp?.let(ComposerInstall::installedVersion)
+            ?: throw LaunchException(LaravelFmtBundle.message("launch.version.unknown"))
+    }
 
-        val result = CompletableFuture<Unit>()
+    private fun download(project: Project, release: LaravelFmtRelease): ByteArray {
+        val result = CompletableFuture<ByteArray>()
 
         ProgressManager.getInstance().run(object : Task.Backgroundable(
             project,
@@ -80,33 +83,20 @@ object LaravelFmtLauncher {
         ) {
             override fun run(indicator: ProgressIndicator) {
                 indicator.text = LaravelFmtBundle.message("launch.download.progress")
-                indicator.isIndeterminate = true
 
                 try {
-                    val output = CapturingProcessHandler(commandLine)
-                        .runProcessWithProgressIndicator(indicator, TimeUnit.SECONDS.toMillis(DOWNLOAD_TIMEOUT_SECONDS).toInt())
+                    val archive = request(release.url(release.archiveName)).readBytes(indicator)
+                    val checksums = request(release.url(release.checksumsName)).readString(indicator)
 
-                    when {
-                        output.isCancelled ->
-                            result.completeExceptionally(LaunchException(LaravelFmtBundle.message("launch.download.cancelled")))
-                        output.isTimeout ->
-                            result.completeExceptionally(
-                                LaunchException(LaravelFmtBundle.message("launch.download.timeout", DOWNLOAD_TIMEOUT_SECONDS)),
-                            )
-                        output.exitCode != 0 ->
-                            result.completeExceptionally(
-                                LaunchException(
-                                    LaravelFmtBundle.message("launch.download.failed.exit", output.exitCode.toString()),
-                                    output.stderr.ifBlank { output.stdout },
-                                ),
-                            )
-                        else -> result.complete(Unit)
-                    }
-                } catch (e: Exception) {
-                    result.completeExceptionally(
-                        LaunchException(LaravelFmtBundle.message("launch.wrapper.failed"), e.message),
-                    )
+                    release.verify(archive, checksums)
+                    result.complete(release.extractBinary(archive))
+                } catch (e: IOException) {
+                    result.completeExceptionally(LaunchException(LaravelFmtBundle.message("launch.download.failed"), e.message))
                 }
+            }
+
+            override fun onCancel() {
+                result.completeExceptionally(LaunchException(LaravelFmtBundle.message("launch.download.cancelled")))
             }
 
             override fun onThrowable(error: Throwable) {
@@ -115,14 +105,21 @@ object LaravelFmtLauncher {
         })
 
         try {
-            // The task enforces its own timeout; this is only a backstop.
-            result.get(DOWNLOAD_TIMEOUT_SECONDS + 30, TimeUnit.SECONDS)
+            // The requests enforce their own timeouts; this is only a backstop.
+            return result.get(DOWNLOAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         } catch (e: ExecutionException) {
             throw e.cause as? LaunchException ?: LaunchException(LaravelFmtBundle.message("launch.download.failed"), e.cause?.message)
         } catch (_: TimeoutException) {
             throw LaunchException(LaravelFmtBundle.message("launch.download.timeout", DOWNLOAD_TIMEOUT_SECONDS))
         }
     }
+
+    /** The IDE's HTTP client, so its proxy settings apply. */
+    private fun request(url: String): RequestBuilder =
+        HttpRequests.request(url)
+            .productNameAsUserAgent()
+            .connectTimeout(TimeUnit.SECONDS.toMillis(30).toInt())
+            .readTimeout(TimeUnit.SECONDS.toMillis(60).toInt())
 
     private fun cacheRoot(): Path = PathManager.getSystemDir().resolve("laravel-fmt").resolve("bin")
 
