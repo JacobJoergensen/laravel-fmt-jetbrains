@@ -11,6 +11,7 @@ import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InitializedParams
 import org.eclipse.lsp4j.MessageActionItem
 import org.eclipse.lsp4j.MessageParams
+import org.eclipse.lsp4j.MessageType
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.Range
@@ -37,6 +38,7 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 
 /**
@@ -55,6 +57,8 @@ class LaravelFmtLspContractTest {
     private lateinit var process: Process
     private lateinit var server: LanguageServer
 
+    private val client = RecordingClient()
+
     private val unformatted = "<?php\nfunction  foo( \$a,\$b ){return \$a+\$b;}\n"
 
     @BeforeEach
@@ -67,7 +71,7 @@ class LaravelFmtLspContractTest {
             .redirectError(ProcessBuilder.Redirect.INHERIT)
             .start()
 
-        val launcher = LSPLauncher.createClientLauncher(NoOpClient(), process.inputStream, process.outputStream)
+        val launcher = LSPLauncher.createClientLauncher(client, process.inputStream, process.outputStream)
         launcher.startListening()
         server = launcher.remoteProxy
     }
@@ -135,6 +139,30 @@ class LaravelFmtLspContractTest {
 
         val formatted = apply(text, format(file))
         assertEquals(cliFormat(file, text), formatted)
+    }
+
+    @Test
+    fun `a broken config is reported once however often the file is formatted`() {
+        initialize()
+        write("laravel-fmt.json", "{")
+        val file = write("app/Example.php", unformatted)
+        open(file, "php", unformatted)
+
+        assertEquals(emptyList<TextEdit>(), format(file))
+        assertEquals(emptyList<TextEdit>(), format(file))
+        assertEquals(listOf(MessageType.Error), client.shown.map { it.type })
+    }
+
+    @Test
+    fun `a file that does not parse is logged without a popup`() {
+        initialize()
+        val text = "<?php\nfunction (\n"
+        val file = write("broken.php", text)
+        open(file, "php", text)
+
+        assertEquals(emptyList<TextEdit>(), format(file))
+        assertTrue(client.shown.isEmpty(), "shown: ${client.shown}")
+        assertEquals(listOf(MessageType.Warning), client.logged.map { it.type })
     }
 
     @Test
@@ -212,12 +240,20 @@ class LaravelFmtLspContractTest {
         return builder.toString()
     }
 
-    private class NoOpClient : LanguageClient {
+    /** Keeps the messages the server sends; the IDE shows `showMessage` as a balloon and only logs `logMessage`. */
+    private class RecordingClient : LanguageClient {
+        val shown = CopyOnWriteArrayList<MessageParams>()
+        val logged = CopyOnWriteArrayList<MessageParams>()
+
         override fun telemetryEvent(`object`: Any?) = Unit
         override fun publishDiagnostics(diagnostics: PublishDiagnosticsParams?) = Unit
-        override fun showMessage(messageParams: MessageParams?) = Unit
+        override fun showMessage(messageParams: MessageParams) {
+            shown += messageParams
+        }
         override fun showMessageRequest(requestParams: ShowMessageRequestParams?): CompletableFuture<MessageActionItem> =
             CompletableFuture.completedFuture(null)
-        override fun logMessage(message: MessageParams?) = Unit
+        override fun logMessage(message: MessageParams) {
+            logged += message
+        }
     }
 }
