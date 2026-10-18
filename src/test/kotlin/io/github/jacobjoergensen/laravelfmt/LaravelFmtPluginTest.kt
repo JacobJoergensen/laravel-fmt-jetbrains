@@ -1,6 +1,7 @@
 package io.github.jacobjoergensen.laravelfmt
 
 import com.intellij.codeInsight.actions.onSave.FormatOnSaveOptions
+import com.intellij.formatting.service.FormattingService
 import com.intellij.ide.actionsOnSave.ActionOnSaveInfoProvider
 import com.intellij.notification.NotificationDisplayType
 import com.intellij.notification.NotificationGroupManager
@@ -57,11 +58,20 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
         assertEquals("blade", descriptor.getLanguageId(blade))
     }
 
-    fun `test the server takes over formatting from the built-in PHP formatter`() {
+    fun `test laravel-fmt formats its files ahead of PhpStorm's own formatter`() {
+        val services = FormattingService.EP_NAME.extensionList
+
+        val laravelFmt = services.indexOfFirst { it is LaravelFmtFormattingService }
+        val builtIn = services.indexOfFirst { it.javaClass.simpleName == "CoreFormattingService" }
+
+        assertTrue("laravel-fmt at $laravelFmt, built-in at $builtIn", laravelFmt in 0 until builtIn)
+    }
+
+    fun `test PhpStorm's LSP formatter doesn't format laravel-fmt's files a second time`() {
         val formatting = LaravelFmtLspServerDescriptor(project).lspCustomization.formattingCustomizer as LspFormattingSupport
         val php = file("Example.php", "<?php echo 1;\n")
 
-        assertTrue(formatting.shouldFormatThisFileExclusivelyByServer(php, true, false))
+        assertFalse(formatting.shouldFormatThisFileExclusivelyByServer(php, true, true))
     }
 
     fun `test a project that doesn't use laravel-fmt keeps the IDE formatter by default`() {

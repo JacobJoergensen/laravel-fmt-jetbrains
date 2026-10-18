@@ -15,6 +15,7 @@
             key="settings.display.name"
             instance="io.github.jacobjoergensen.laravelfmt.LaravelFmtConfigurable"/>
         <notificationGroup id="laravel-fmt" displayType="BALLOON" key="notification.group.name"/>
+        <formattingService implementation="io.github.jacobjoergensen.laravelfmt.LaravelFmtFormattingService" order="first"/>
         <actionOnSaveInfoProvider
             id="LaravelFmtOnSaveInfoProvider"
             implementation="io.github.jacobjoergensen.laravelfmt.LaravelFmtOnSaveInfoProvider"

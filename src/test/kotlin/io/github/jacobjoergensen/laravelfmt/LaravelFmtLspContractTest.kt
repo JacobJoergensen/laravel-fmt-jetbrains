@@ -25,7 +25,6 @@ import org.eclipse.lsp4j.VersionedTextDocumentIdentifier
 import org.eclipse.lsp4j.WorkspaceFolder
 import org.eclipse.lsp4j.launch.LSPLauncher
 import org.eclipse.lsp4j.services.LanguageClient
-import org.eclipse.lsp4j.services.LanguageServer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -43,7 +42,7 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Checks what the plugin relies on from a real `laravel-fmt lsp`: its capabilities, full text sync,
- * UTF-16 positions, formatting equal to the CLI, and a clean shutdown.
+ * UTF-16 positions, formatting equal to the CLI, `laravel-fmt/endOfLine`, and a clean shutdown.
  *
  * Skipped unless `LARAVEL_FMT_BINARY` points at a binary, e.g. from `go build -o /tmp/laravel-fmt .`
  * in the laravel-fmt repo.
@@ -55,7 +54,7 @@ class LaravelFmtLspContractTest {
 
     private lateinit var binary: String
     private lateinit var process: Process
-    private lateinit var server: LanguageServer
+    private lateinit var server: LaravelFmtLanguageServer
 
     private val client = RecordingClient()
 
@@ -71,7 +70,12 @@ class LaravelFmtLspContractTest {
             .redirectError(ProcessBuilder.Redirect.INHERIT)
             .start()
 
-        val launcher = LSPLauncher.createClientLauncher(client, process.inputStream, process.outputStream)
+        val launcher = LSPLauncher.Builder<LaravelFmtLanguageServer>()
+            .setLocalService(client)
+            .setRemoteInterface(LaravelFmtLanguageServer::class.java)
+            .setInput(process.inputStream)
+            .setOutput(process.outputStream)
+            .create()
         launcher.startListening()
         server = launcher.remoteProxy
     }
@@ -154,6 +158,19 @@ class LaravelFmtLspContractTest {
     }
 
     @Test
+    fun `the line ending the project's config asks for is reported`() {
+        initialize()
+        val file = write("app/Example.php", unformatted)
+        open(file, "php", unformatted)
+
+        assertEquals("lf", endOfLine(file))
+
+        write("laravel-fmt.json", """{ "endOfLine": "crlf" }""")
+
+        assertEquals("crlf", endOfLine(file))
+    }
+
+    @Test
     fun `a file that does not parse is logged without a popup`() {
         initialize()
         val text = "<?php\nfunction (\n"
@@ -200,6 +217,9 @@ class LaravelFmtLspContractTest {
             DidChangeTextDocumentParams(VersionedTextDocumentIdentifier(uri(file), version), listOf(TextDocumentContentChangeEvent(text))),
         )
 
+    private fun endOfLine(file: Path): String =
+        server.endOfLine(LaravelFmtLanguageServer.EndOfLineParams(TextDocumentIdentifier(uri(file)))).get(30, TimeUnit.SECONDS)
+
     private fun format(file: Path): List<TextEdit> =
         server.textDocumentService
             .formatting(DocumentFormattingParams(TextDocumentIdentifier(uri(file)), FormattingOptions(4, true)))
@@ -219,26 +239,7 @@ class LaravelFmtLspContractTest {
         return output
     }
 
-    /** Applies LSP edits; with UTF-16 positions, LSP characters are Java `char` offsets. */
-    private fun apply(text: String, edits: List<TextEdit>): String {
-        val lineStarts = mutableListOf(0)
-
-        text.forEachIndexed { i, c ->
-            if (c == '\n') {
-                lineStarts += i + 1
-            }
-        }
-
-        fun offset(p: Position) = (lineStarts.getOrElse(p.line) { text.length } + p.character).coerceAtMost(text.length)
-
-        val builder = StringBuilder(text)
-
-        edits.sortedWith(compareBy({ -it.range.start.line }, { -it.range.start.character })).forEach {
-            builder.replace(offset(it.range.start), offset(it.range.end), it.newText)
-        }
-
-        return builder.toString()
-    }
+    private fun apply(text: String, edits: List<TextEdit>): String = LaravelFmtFormattingService.applyEdits(text, edits)
 
     /** Keeps the messages the server sends; the IDE shows `showMessage` as a balloon and only logs `logMessage`. */
     private class RecordingClient : LanguageClient {

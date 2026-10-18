@@ -10,6 +10,7 @@ import com.intellij.platform.lsp.api.customization.LspCustomization
 import com.intellij.platform.lsp.api.customization.LspFormattingCustomizer
 import com.intellij.platform.lsp.api.customization.LspFormattingSupport
 import com.jetbrains.php.lang.PhpFileType
+import org.eclipse.lsp4j.services.LanguageServer
 import java.nio.charset.StandardCharsets
 
 /** Only formatting is configured: the server advertises nothing else, so other LSP features stay off. */
@@ -45,20 +46,19 @@ class LaravelFmtLspServerDescriptor(project: Project) : ProjectWideLspServerDesc
         return commandLine
     }
 
+    override val lsp4jServerClass: Class<out LanguageServer> = LaravelFmtLanguageServer::class.java
+
     override val lspCustomization: LspCustomization = object : LspCustomization() {
         override val formattingCustomizer: LspFormattingCustomizer = LaravelFmtFormattingSupport
     }
 
-    /**
-     * The IDE keeps formatting PHP and Blade itself by default, because it has its own formatter for them.
-     * Always returning `true` routes Reformat Code and format on save to laravel-fmt instead.
-     */
+    /** [LaravelFmtFormattingService] formats these files instead. */
     private object LaravelFmtFormattingSupport : LspFormattingSupport() {
         override fun shouldFormatThisFileExclusivelyByServer(
             file: VirtualFile,
             ideCanFormatThisFileItself: Boolean,
             serverExplicitlyWantsToFormatThisFile: Boolean,
-        ): Boolean = true
+        ): Boolean = false
     }
 
     companion object {
