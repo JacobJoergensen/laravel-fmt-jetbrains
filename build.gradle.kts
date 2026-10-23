@@ -42,6 +42,8 @@ dependencies {
 }
 
 intellijPlatform {
+    buildSearchableOptions = false
+
     pluginConfiguration {
         description = providers.fileContents(layout.projectDirectory.file("README.md")).asText.map {
             val start = "<!-- Plugin description -->"
@@ -105,6 +107,10 @@ java {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+tasks.assemble {
+    dependsOn(tasks.buildPlugin)
 }
 
 changelog {
