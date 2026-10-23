@@ -1,0 +1,32 @@
+name: Feature or change proposal
+description: Propose a feature or a change before you open a PR.
+labels: ["proposal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For anything beyond a small fix, start here. A change to how files are formatted belongs in [laravel-fmt](https://github.com/JacobJoergensen/laravel-fmt/issues/new/choose).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: The use case behind the request, not just the feature itself.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What do you have in mind?
+      description: How it would work, and what the setting or action would look like if it adds one.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Does this add or change a setting, action, or notification?
+      options:
+        - "No"
+        - "Yes"
+        - "Not sure"
+    validations:
+      required: true

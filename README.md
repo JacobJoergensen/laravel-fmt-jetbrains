@@ -41,20 +41,6 @@ Settings | Tools | laravel-fmt lets you:
 - run it on save
 - point it at a specific binary
 
-## Development
-
-```bash
-./gradlew test
-./gradlew runIde
-./gradlew verifyPlugin
-```
-
-Set `LARAVEL_FMT_BINARY` to a laravel-fmt binary if you want the LSP contract tests to run too.
-
-To release, bump `pluginVersion` in `gradle.properties`, move the Unreleased notes in `CHANGELOG.md`
-under the new version, and publish a GitHub release tagged with the version, e.g. `1.0.0`. Pre-releases go to the EAP
-channel.
-
 ## License
 
 MIT. See [LICENSE](LICENSE.md).

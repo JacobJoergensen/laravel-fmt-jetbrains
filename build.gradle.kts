@@ -82,7 +82,6 @@ intellijPlatform {
 
     publishing {
         token = providers.environmentVariable("PUBLISH_TOKEN")
-        channels = providers.gradleProperty("publishChannel").map { listOf(it) }.orElse(listOf("default"))
     }
 
     pluginVerification {

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a formatting bug
+    url: https://github.com/JacobJoergensen/laravel-fmt/issues/new/choose
+    about: Wrong output that the laravel-fmt CLI gives too belongs in laravel-fmt.
+  - name: Report a security issue
+    url: https://github.com/JacobJoergensen/laravel-fmt-jetbrains/security/advisories/new
+    about: Please report security issues privately, not as a public issue.

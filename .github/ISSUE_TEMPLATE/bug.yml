@@ -1,0 +1,96 @@
+name: Bug report
+description: Report a bug in the laravel-fmt plugin.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this. If the CLI gives the same wrong output, report it in [laravel-fmt](https://github.com/JacobJoergensen/laravel-fmt/issues/new/choose) instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the bug, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: How to reproduce the bug?
+      description: The steps that trigger it, and the output or error you got versus what you expected. Include your laravel-fmt.json if it is not the default.
+    validations:
+      required: true
+  - type: input
+    id: ide-version
+    attributes:
+      label: IDE version
+      description: From Help | About, e.g. PhpStorm 2025.3.1.
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: From Settings | Plugins.
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: laravel-fmt version
+      description: Output of `laravel-fmt --version`.
+      placeholder: "0.4.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How is laravel-fmt installed?
+      options:
+        - Composer
+        - Composer in Sail or WSL
+        - On PATH
+        - Path set in the plugin settings
+    validations:
+      required: true
+  - type: dropdown
+    id: trigger
+    attributes:
+      label: How was it run?
+      options:
+        - Reformat Code on a file
+        - Reformat Code on a selection
+        - Reformat Code on a folder
+        - On save
+        - Before commit
+        - Not trigger-specific
+    validations:
+      required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: Which language?
+      options:
+        - PHP
+        - Blade
+        - Not language-specific
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Anything else worth knowing. Related issues, things you have already ruled out, or errors from Help | Show Log.
+    validations:
+      required: false

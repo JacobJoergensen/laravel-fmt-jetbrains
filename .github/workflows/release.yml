@@ -1,8 +1,9 @@
 name: Release
 
 on:
-  release:
-    types: [ published ]
+  push:
+    tags:
+      - '*'
 
 permissions:
   contents: read
@@ -18,17 +19,52 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Check tag matches plugin version
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          TAG: ${{ github.ref_name }}
         run: |
           version="$(sed -n 's/^pluginVersion[[:space:]]*=[[:space:]]*//p' gradle.properties | tr -d '[:space:]')"
-          if [ "${TAG#v}" != "$version" ]; then
-            echo "::error::Release tag '$TAG' does not match pluginVersion '$version' in gradle.properties"
+          if [ "$TAG" != "$version" ]; then
+            echo "::error::Tag '$TAG' does not match pluginVersion '$version' in gradle.properties"
             exit 1
           fi
+
+      - name: Extract release notes from CHANGELOG.md
+        env:
+          TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          notes="$RUNNER_TEMP/release-notes.md"
+
+          if ! awk -v header="## Version $TAG" '
+            $0 == header || index($0, header " (") == 1 { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+            END { exit !found }
+          ' CHANGELOG.md > "$notes"; then
+            echo "::error file=CHANGELOG.md::No '## Version $TAG' heading in CHANGELOG.md"
+            exit 1
+          fi
+
+          if ! grep -q '[^[:space:]]' "$notes"; then
+            echo "::error file=CHANGELOG.md::No entries under '## Version $TAG' in CHANGELOG.md"
+            exit 1
+          fi
+
+          previous=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
+          if [ -n "$previous" ]; then
+            printf '\n**Full Changelog**: https://github.com/%s/compare/%s...%s\n' "$REPOSITORY" "$previous" "$TAG" >> "$notes"
+          fi
+
+      - name: Upload release notes
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-notes
+          path: ${{ runner.temp }}/release-notes.md
+          if-no-files-found: error
 
       - name: Set up JDK 21
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
@@ -76,13 +112,7 @@ jobs:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
           PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
-          PRERELEASE: ${{ github.event.release.prerelease }}
-        run: |
-          if [ "$PRERELEASE" = "true" ]; then
-            ./gradlew publishPlugin -PpublishChannel=eap
-          else
-            ./gradlew publishPlugin
-          fi
+        run: ./gradlew publishPlugin
 
       - name: Upload signed plugin
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -105,6 +135,12 @@ jobs:
           name: signed-plugin
           path: dist
 
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-notes
+          path: notes
+
       - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
+          body_path: notes/release-notes.md
           files: dist/*.zip
