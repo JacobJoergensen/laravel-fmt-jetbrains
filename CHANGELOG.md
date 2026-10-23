@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+
+## Version 0.2.0 (2026-10-23)
 * Added an Automatic mode, now the default, that only runs laravel-fmt in projects that use it
 * Added a Run laravel-fmt save action that formats only PHP and Blade files
 * Added PHP and Blade checkboxes, so laravel-fmt can format just one of them
