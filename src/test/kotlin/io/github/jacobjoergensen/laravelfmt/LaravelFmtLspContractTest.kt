@@ -43,11 +43,9 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 
 /**
- * Checks what the plugin relies on from a real `laravel-fmt lsp`: its capabilities, full text sync,
- * UTF-16 positions, formatting equal to the CLI, `laravel-fmt/endOfLine`, and a clean shutdown.
- *
  * Skipped unless `LARAVEL_FMT_BINARY` points at a binary, e.g. from `go build -o /tmp/laravel-fmt .`
- * in the laravel-fmt repo.
+ * in the laravel-fmt repo. CI runs them against the release named by `laravelFmtVersion` in
+ * `gradle.properties`, and fails instead of skipping.
  */
 class LaravelFmtLspContractTest {
 
@@ -60,12 +58,19 @@ class LaravelFmtLspContractTest {
 
     private val client = RecordingClient()
 
-    private val unformatted = "<?php\nfunction  foo( \$a,\$b ){return \$a+\$b;}\n"
+    private val unformatted = $$"<?php\nfunction  foo( $a,$b ){return $a+$b;}\n"
 
     @BeforeEach
     fun startServer() {
         binary = System.getenv("LARAVEL_FMT_BINARY").orEmpty()
-        assumeTrue(binary.isNotEmpty() && File(binary).isFile, "LARAVEL_FMT_BINARY not set; skipping LSP contract test")
+        val found = binary.isNotEmpty() && File(binary).isFile
+
+        // CI builds what gets released, so skipping there would pass a plugin that never met a real server.
+        if (System.getenv("CI") == "true") {
+            assertTrue(found, "LARAVEL_FMT_BINARY must point at a laravel-fmt binary in CI")
+        } else {
+            assumeTrue(found, "LARAVEL_FMT_BINARY not set; skipping LSP contract test")
+        }
 
         process = ProcessBuilder(binary, "lsp")
             .directory(projectDir.toFile())
@@ -85,7 +90,8 @@ class LaravelFmtLspContractTest {
     @AfterEach
     fun stopServer() {
         if (::process.isInitialized && process.isAlive) {
-            process.destroyForcibly()
+            // Windows won't delete the temp project while the server still has it as its working directory.
+            process.destroyForcibly().waitFor(10, TimeUnit.SECONDS)
         }
     }
 
@@ -111,8 +117,7 @@ class LaravelFmtLspContractTest {
         val formatted = apply(unformatted, format(file))
         assertEquals(cliFormat(file, unformatted), formatted)
 
-        // Full sync: send the formatted text as a whole-document change, then nothing is left to do.
-        change(file, 2, formatted)
+        change(file, formatted)
         assertEquals(emptyList<TextEdit>(), format(file))
     }
 
@@ -137,7 +142,7 @@ class LaravelFmtLspContractTest {
         initialize()
         // The server applies whole line-level diff hunks that overlap the range, so the two messy
         // statements are kept apart by an already-formatted line to land in separate hunks.
-        val text = "<?php\n\n\$a  =  1;\necho 'x';\n\$b  =  2;\n"
+        val text = $$"<?php\n\n$a  =  1;\necho 'x';\n$b  =  2;\n"
         val file = write("range.php", text)
         open(file, "php", text)
 
@@ -148,14 +153,14 @@ class LaravelFmtLspContractTest {
         )
         val result = apply(text, server.textDocumentService.rangeFormatting(params).get(30, TimeUnit.SECONDS))
 
-        assertTrue(result.contains("\$a = 1;"), result)
-        assertTrue(result.contains("\$b  =  2;"), result)
+        assertTrue(result.contains($$"$a = 1;"), result)
+        assertTrue(result.contains($$"$b  =  2;"), result)
     }
 
     @Test
     fun `blade files are accepted with the blade language id`() {
         initialize()
-        val text = "<div>{{ \$name }}</div>\n"
+        val text = $$"<div>{{ $name }}</div>\n"
         val file = write("resources/views/welcome.blade.php", text)
         open(file, "blade", text)
 
@@ -201,6 +206,18 @@ class LaravelFmtLspContractTest {
     }
 
     @Test
+    fun `a file that does not parse keeps its line ending`() {
+        assumeServerAtLeast(initialize().serverInfo?.version, "0.7.1")
+        write("laravel-fmt.json", """{ "endOfLine": "lf" }""")
+        val text = "<?php\r\nfunction (\r\n"
+        val file = write("broken.php", text)
+        open(file, "php", text)
+
+        assertEquals(emptyList<TextEdit>(), format(file))
+        assertEquals("auto", endOfLine(file))
+    }
+
+    @Test
     fun `shutdown then exit ends the process with code 0`() {
         initialize()
         server.shutdown().get(10, TimeUnit.SECONDS)
@@ -219,6 +236,18 @@ class LaravelFmtLspContractTest {
         },
     ).get(30, TimeUnit.SECONDS).also { server.initialized(InitializedParams()) }
 
+    /** A build without a release number counts as new: a local `go build` reports `v0.0.0-<date>-<commit>`. */
+    private fun assumeServerAtLeast(version: String?, minimum: String) {
+        val actual = releaseNumbers(version)?.takeIf { numbers -> numbers.any { it != 0 } } ?: return
+        val required = releaseNumbers(minimum)!!
+        val behind = actual.zip(required).firstOrNull { (a, r) -> a != r }?.let { (a, r) -> a < r } ?: (actual.size < required.size)
+
+        assumeTrue(!behind, "laravel-fmt $version predates $minimum")
+    }
+
+    private fun releaseNumbers(version: String?): List<Int>? =
+        version?.removePrefix("v")?.substringBefore('-')?.split('.')?.map { it.toIntOrNull() ?: return null }
+
     private fun write(relative: String, text: String): Path =
         projectDir.resolve(relative).also {
             Files.createDirectories(it.parent)
@@ -230,9 +259,9 @@ class LaravelFmtLspContractTest {
     private fun open(file: Path, languageId: String, text: String) =
         server.textDocumentService.didOpen(DidOpenTextDocumentParams(TextDocumentItem(uri(file), languageId, 1, text)))
 
-    private fun change(file: Path, version: Int, text: String) =
+    private fun change(file: Path, text: String) =
         server.textDocumentService.didChange(
-            DidChangeTextDocumentParams(VersionedTextDocumentIdentifier(uri(file), version), listOf(TextDocumentContentChangeEvent(text))),
+            DidChangeTextDocumentParams(VersionedTextDocumentIdentifier(uri(file), 2), listOf(TextDocumentContentChangeEvent(text))),
         )
 
     private fun endOfLine(file: Path): String =

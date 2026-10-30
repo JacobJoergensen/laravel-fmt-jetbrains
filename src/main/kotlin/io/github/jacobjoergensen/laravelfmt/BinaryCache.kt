@@ -14,9 +14,8 @@ import java.time.Duration
 import java.util.HexFormat
 
 /**
- * Native laravel-fmt binaries the server runs: copies of the one under `vendor/`, and downloaded releases.
- * The server never runs the file under `vendor/` itself, since Windows locks a running executable, which
- * would make `composer update` fail while the IDE is open.
+ * The server never runs the binary under `vendor/` itself: Windows locks a running executable, so
+ * `composer update` would fail while the IDE is open.
  */
 class BinaryCache(private val root: Path, private val clock: Clock = Clock.systemUTC()) {
 
@@ -24,7 +23,7 @@ class BinaryCache(private val root: Path, private val clock: Clock = Clock.syste
         val hash = sha256(source)
         val dir = root.resolve(hash.take(HASH_PREFIX_LENGTH))
         val target = dir.resolve(source.fileName.toString())
-        val isIntact = { Files.isRegularFile(target) && sha256(target) == hash }
+        val isIntact = { isRunnable(target) && sha256(target) == hash }
 
         if (!isIntact()) {
             install(target, isIntact) { Files.copy(source, it, StandardCopyOption.REPLACE_EXISTING) }
@@ -36,7 +35,7 @@ class BinaryCache(private val root: Path, private val clock: Clock = Clock.syste
     /** Unlike [materialize], not hashed again on later use: the checksum was verified on download. */
     fun release(key: String, binaryName: String, download: () -> ByteArray): Path {
         val target = root.resolve(key).resolve(binaryName)
-        val isIntact = { Files.isRegularFile(target) }
+        val isIntact = { isRunnable(target) }
 
         if (!isIntact()) {
             val binary = download()
@@ -54,7 +53,17 @@ class BinaryCache(private val root: Path, private val clock: Clock = Clock.syste
 
         try {
             write(temp)
-            temp.toFile().setExecutable(true, true)
+
+            // Check the outcome, not the return value: Windows has no execute bit, and a noexec mount takes the
+            // bit but won't run the file.
+            val bitSet = temp.toFile().setExecutable(true, true)
+
+            if (!Files.isExecutable(temp)) {
+                val reason = if (bitSet) " Its folder doesn't allow running programs." else ""
+
+                throw IOException("Could not make $target executable.$reason")
+            }
+
             moveIntoPlace(temp, target, isIntact)
         } finally {
             Files.deleteIfExists(temp)
@@ -85,9 +94,8 @@ class BinaryCache(private val root: Path, private val clock: Clock = Clock.syste
     }
 
     /**
-     * Removes versions no project has used for a while. The cache is shared by all open projects, so a
-     * version another project just prepared must survive. Ones still running stay, since Windows keeps
-     * them locked.
+     * The cache is shared by all open projects, so a version another project just prepared must survive.
+     * Ones still running stay, since Windows keeps them locked.
      */
     private fun pruneUnused() {
         val cutoff = clock.instant().minus(UNUSED_FOR)
@@ -109,6 +117,8 @@ class BinaryCache(private val root: Path, private val clock: Clock = Clock.syste
         const val HASH_PREFIX_LENGTH = 16
 
         val UNUSED_FOR: Duration = Duration.ofDays(7)
+
+        fun isRunnable(file: Path): Boolean = Files.isRegularFile(file) && Files.isExecutable(file)
 
         fun sha256(file: Path): String {
             val digest = MessageDigest.getInstance("SHA-256")

@@ -24,9 +24,9 @@ repositories {
 dependencies {
     testImplementation(platform("org.junit:junit-bom:6.1.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.junit.vintage:junit-vintage-engine")
+
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    testImplementation("junit:junit:4.13.2")
-    testRuntimeOnly("org.junit.vintage:junit-vintage-engine")
 
     intellijPlatform {
         phpstorm(providers.gradleProperty("platformVersion").get())
@@ -107,6 +107,11 @@ java {
 
 tasks.test {
     useJUnitPlatform()
+
+    // The LSP contract tests run against this binary, so a cached result must not stand in for a different one.
+    inputs.property("laravelFmtVersion", providers.gradleProperty("laravelFmtVersion"))
+    inputs.property("laravelFmtBinary", providers.environmentVariable("LARAVEL_FMT_BINARY").orElse(""))
+    inputs.property("ci", providers.environmentVariable("CI").orElse(""))
 }
 
 tasks.assemble {

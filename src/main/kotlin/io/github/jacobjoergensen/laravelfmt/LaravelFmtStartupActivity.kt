@@ -12,11 +12,13 @@ import kotlinx.coroutines.withContext
  */
 class LaravelFmtStartupActivity : ProjectActivity {
 
+    @Suppress("kotlin:S6310")
+    // The platform owns this scope; blocking work goes to IO, and nothing would inject another dispatcher.
     override suspend fun execute(project: Project) {
         val server = project.service<LaravelFmtServerService>()
 
         if (!server.isOff) {
-            withContext(Dispatchers.IO) { server.resolve() }
+            withContext(Dispatchers.IO) { server.refresh() }
         }
     }
 }

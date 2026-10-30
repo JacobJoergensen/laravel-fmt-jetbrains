@@ -28,7 +28,7 @@ class LaravelFmtOnSaveAction : ActionsOnSaveFileDocumentManagerListener.ActionOn
         project.service<LaravelFmtProjectSettings>().formatOnSave && project.service<LaravelFmtServerService>().isEnabled
 
     override fun processDocuments(project: Project, documents: Array<Document>) {
-        // The same guard as the IDE's own Reformat code save action.
+        // Skips the saves a reformat makes, as the IDE's own Reformat code save action does.
         if (CommandProcessor.getInstance().currentCommandName == ReformatCodeProcessor.getCommandName()) {
             return
         }
@@ -51,20 +51,15 @@ class LaravelFmtOnSaveAction : ActionsOnSaveFileDocumentManagerListener.ActionOn
         }.run()
     }
 
-    companion object {
-        /**
-         * Files outside the project, such as library sources, are left alone, and so are files the IDE's own
-         * Reformat code save action already sends to laravel-fmt.
-         */
-        fun formatsOnSave(project: Project, file: VirtualFile): Boolean {
-            val ideOptions = FormatOnSaveOptions.getInstance(project)
-            val ideFormatsOnSave = ideOptions.isRunOnSaveEnabled && ideOptions.isFileTypeSelected(file.fileType)
+}
 
-            return !ideFormatsOnSave &&
-                project.service<LaravelFmtServerService>().formats(file) &&
-                ProjectFileIndex.getInstance(project).isInContent(file)
-        }
-    }
+fun formatsOnSave(project: Project, file: VirtualFile): Boolean {
+    val ideOptions = FormatOnSaveOptions.getInstance(project)
+    val ideFormatsOnSave = ideOptions.isRunOnSaveEnabled && ideOptions.isFileTypeSelected(file.fileType)
+
+    return !ideFormatsOnSave &&
+        project.service<LaravelFmtServerService>().formats(file) &&
+        ProjectFileIndex.getInstance(project).isInContent(file)
 }
 
 class LaravelFmtOnSaveInfoProvider : ActionOnSaveInfoProvider() {

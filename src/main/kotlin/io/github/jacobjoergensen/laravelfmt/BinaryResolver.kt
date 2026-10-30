@@ -2,13 +2,6 @@ package io.github.jacobjoergensen.laravelfmt
 
 import java.io.File
 
-/**
- * Finds the `laravel-fmt` executable, in this order:
- *  1. the explicit path from the settings, if it exists
- *  2. `vendor/bin/laravel-fmt` in a project root or one of its subfolders, only for trusted projects,
- *     since that binary ships with the project
- *  3. `PATH`
- */
 object BinaryResolver {
 
     const val BASE_NAME = "laravel-fmt"
@@ -17,7 +10,6 @@ object BinaryResolver {
 
     private val SKIPPED_SUBDIRECTORIES = setOf("vendor", "node_modules", "storage", "bootstrap", "public")
 
-    /** A drive path (`C:\`) or a UNC path (`\\server\share`). */
     private val WINDOWS_ABSOLUTE = Regex("""^([A-Za-z]:[\\/]|\\\\)""")
 
     private fun vendorBinCandidates(isWindows: Boolean): List<String> {
@@ -28,20 +20,10 @@ object BinaryResolver {
         return listOf(BASE_NAME)
     }
 
-    fun findProjectLocal(
-        roots: List<String>,
-        isWindows: Boolean,
-        fileExists: (String) -> Boolean = ::isFile,
-        listSubdirectories: (String) -> List<String> = ::subdirectoryNames,
-    ): String? = projectDirs(roots, listSubdirectories).firstNotNullOfOrNull { vendorBinIn(it, isWindows, fileExists) }
-
     fun vendorBinIn(dir: String, isWindows: Boolean, fileExists: (String) -> Boolean = ::isFile): String? =
         vendorBinCandidates(isWindows).map { "$dir/vendor/bin/$it" }.firstOrNull(fileExists)
 
-    /**
-     * The roots, then up to [MAX_NESTING] levels below them, level by level, so a Laravel app in a
-     * monorepo's `apps/web/` is found. Lazy, so a search that stops early lists no more folders.
-     */
+    /** The roots, then up to [MAX_NESTING] levels below them, level by level. Callers rely on this order. */
     fun projectDirs(
         roots: List<String>,
         listSubdirectories: (String) -> List<String> = ::subdirectoryNames,
@@ -100,12 +82,11 @@ object BinaryResolver {
 
     fun resolve(
         explicitPath: String?,
-        projectRoots: List<String>,
+        appDirs: List<String>,
         isWindows: Boolean,
         allowProjectLocal: Boolean,
         pathLookup: (String) -> String?,
         fileExists: (String) -> Boolean = ::isFile,
-        listSubdirectories: (String) -> List<String> = ::subdirectoryNames,
     ): String? {
         // A stale explicit path falls through to auto-detection instead of breaking a working project.
         explicitPath?.trim()
@@ -113,7 +94,7 @@ object BinaryResolver {
             ?.let { return it }
 
         if (allowProjectLocal) {
-            findProjectLocal(projectRoots, isWindows, fileExists, listSubdirectories)?.let { return it }
+            appDirs.firstNotNullOfOrNull { vendorBinIn(it, isWindows, fileExists) }?.let { return it }
         }
 
         return pathLookup(BASE_NAME)

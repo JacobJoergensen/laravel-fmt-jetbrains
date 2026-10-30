@@ -20,7 +20,10 @@ import com.intellij.ui.layout.not
 import java.io.File
 
 /** No formatting options on purpose: those come from the project config the server reads. */
-class LaravelFmtConfigurable(private val project: Project) : BoundConfigurable(LaravelFmtBundle.message("settings.display.name")) {
+class LaravelFmtConfigurable(private val project: Project) : BoundConfigurable(
+    // The page is named after the tool, which is written in lowercase.
+    @Suppress("DialogTitleCapitalization") LaravelFmtBundle.message("settings.display.name"),
+) {
 
     private val projectSettings get() = project.service<LaravelFmtProjectSettings>()
     private val appSettings get() = service<LaravelFmtSettings>()
@@ -31,7 +34,7 @@ class LaravelFmtConfigurable(private val project: Project) : BoundConfigurable(L
 
     override fun createPanel(): DialogPanel {
         val descriptor = FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor()
-            .withTitle(LaravelFmtBundle.message("settings.binary.chooser.title"))
+            .withTitle(@Suppress("DialogTitleCapitalization") LaravelFmtBundle.message("settings.binary.chooser.title"))
             .withDescription(LaravelFmtBundle.message("settings.binary.chooser.description"))
 
         val pathField = TextFieldWithBrowseButton().apply {

@@ -1,5 +1,7 @@
 <idea-plugin>
     <id>io.github.jacobjoergensen.laravel-fmt</id>
+    <!-- laravel-fmt is written in lowercase, also where the platform wants capitals. -->
+    <!--suppress PluginXmlCapitalization -->
     <name>laravel-fmt</name>
     <vendor email="jj@minehubsstudios.com" url="https://github.com/jacobjoergensen/laravel-fmt">Jacob Jørgensen</vendor>
 
@@ -9,11 +11,13 @@
     <depends>com.jetbrains.php</depends>
 
     <extensions defaultExtensionNs="com.intellij">
+        <!--suppress PluginXmlCapitalization -->
         <projectConfigurable
             parentId="tools"
             id="io.github.jacobjoergensen.laravelfmt.settings"
             key="settings.display.name"
             instance="io.github.jacobjoergensen.laravelfmt.LaravelFmtConfigurable"/>
+        <!--suppress PluginXmlCapitalization -->
         <notificationGroup id="laravel-fmt" displayType="BALLOON" key="notification.group.name"/>
         <postStartupActivity implementation="io.github.jacobjoergensen.laravelfmt.LaravelFmtStartupActivity"/>
         <formattingService implementation="io.github.jacobjoergensen.laravelfmt.LaravelFmtFormattingService" order="first"/>
@@ -26,10 +30,11 @@
     </extensions>
 
     <extensions defaultExtensionNs="com.intellij.platform.lsp">
-        <serverSupportProvider implementation="io.github.jacobjoergensen.laravelfmt.LaravelFmtLspServerSupportProvider"/>
+        <integrationProvider implementation="io.github.jacobjoergensen.laravelfmt.LaravelFmtLspIntegrationProvider"/>
     </extensions>
 
     <actions>
+        <!--suppress PluginXmlCapitalization -->
         <action id="LaravelFmt.RestartServer" class="io.github.jacobjoergensen.laravelfmt.LaravelFmtRestartAction">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>

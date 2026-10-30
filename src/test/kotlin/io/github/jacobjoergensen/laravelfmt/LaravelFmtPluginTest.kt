@@ -8,11 +8,10 @@ import com.intellij.notification.NotificationGroupManager
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.components.service
-import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.platform.lsp.api.LspServerDescriptor
-import com.intellij.platform.lsp.api.LspServerSupportProvider
+import com.intellij.platform.lsp.api.LspClientDescriptor
+import com.intellij.platform.lsp.api.LspIntegrationProvider
 import com.intellij.platform.lsp.api.customization.LspFormattingSupport
 import com.intellij.testFramework.LightVirtualFile
 import com.intellij.testFramework.TestActionEvent
@@ -20,7 +19,6 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jetbrains.php.lang.PhpFileType
 import io.github.jacobjoergensen.laravelfmt.LaravelFmtProjectSettings.Mode
 
-/** Runs in a PhpStorm test instance, for the wiring unit tests can't reach: plugin.xml, services, actions. */
 class LaravelFmtPluginTest : BasePlatformTestCase() {
 
     private val projectSettings get() = project.service<LaravelFmtProjectSettings>()
@@ -41,21 +39,51 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
     }
 
     fun `test laravel-fmt is available as a language server`() {
-        val providers = ExtensionPointName<LspServerSupportProvider>("com.intellij.platform.lsp.serverSupportProvider").extensionList
+        val providers = LspIntegrationProvider.EP_NAME.extensionList
 
-        assertTrue(providers.any { it is LaravelFmtLspServerSupportProvider })
+        assertTrue(providers.any { it is LaravelFmtLspIntegrationProvider })
     }
 
     fun `test PHP and Blade files are supported with their language ids`() {
-        val descriptor = LaravelFmtLspServerDescriptor(project)
+        val descriptor = LaravelFmtLspClientDescriptor(project)
         val php = file("Example.php", "<?php echo 1;\n")
-        val blade = file("welcome.blade.php", "<div>{{ \$name }}</div>\n")
+        val blade = file("welcome.blade.php", $$"<div>{{ $name }}</div>\n")
 
         assertTrue(descriptor.isSupportedFile(php))
         assertTrue(descriptor.isSupportedFile(blade))
         assertFalse(descriptor.isSupportedFile(file("notes.txt", "hello\n")))
         assertEquals("php", descriptor.getLanguageId(php))
         assertEquals("blade", descriptor.getLanguageId(blade))
+    }
+
+    fun `test the EDT keeps the last lookup after an input changes instead of looking up again`() {
+        val server = project.service<LaravelFmtServerService>()
+
+        server.refresh()
+        val apps = server.apps()
+        val resolution = server.resolve(app = null)
+
+        server.invalidate()
+
+        assertSame(apps, server.apps())
+        assertSame(resolution, server.resolve(app = null))
+    }
+
+    fun `test the server outside every app isn't taken for the one of an app at the project root`() {
+        val root = project.basePath!!.replace('\\', '/').trimEnd('/')
+
+        val outside = LaravelFmtLspClientDescriptor(project, app = null)
+        val rootApp = LaravelFmtLspClientDescriptor(project, app = root)
+
+        assertEquals("laravel-fmt", rootApp.presentableName)
+        assertFalse(outside.presentableName == rootApp.presentableName)
+    }
+
+    fun `test an app's server only gets the files of that app`() {
+        val php = file("Example.php", "<?php echo 1;\n")
+
+        assertTrue(LaravelFmtLspClientDescriptor(project, app = null).isSupportedFile(php))
+        assertFalse(LaravelFmtLspClientDescriptor(project, app = "/elsewhere/apps/shop").isSupportedFile(php))
     }
 
     fun `test laravel-fmt formats its files ahead of PhpStorm's own formatter`() {
@@ -68,16 +96,16 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
     }
 
     fun `test PhpStorm's LSP formatter doesn't format laravel-fmt's files a second time`() {
-        val formatting = LaravelFmtLspServerDescriptor(project).lspCustomization.formattingCustomizer as LspFormattingSupport
+        val formatting = LaravelFmtLspClientDescriptor(project).lspCustomization.formattingCustomizer as LspFormattingSupport
         val php = file("Example.php", "<?php echo 1;\n")
 
-        assertFalse(formatting.shouldFormatThisFileExclusivelyByServer(php, true, true))
+        assertFalse(formatting.shouldFormatThisFileExclusivelyByServer(php, ideCanFormatThisFileItself = true, serverExplicitlyWantsToFormatThisFile = true))
     }
 
     fun `test a project that doesn't use laravel-fmt keeps the IDE formatter by default`() {
         projectSettings.loadState(LaravelFmtProjectSettings.State())
 
-        assertFalse(LaravelFmtLspServerDescriptor(project).isSupportedFile(file("Example.php", "<?php echo 1;\n")))
+        assertFalse(LaravelFmtLspClientDescriptor(project).isSupportedFile(file("Example.php", "<?php echo 1;\n")))
     }
 
     fun `test a project switched off with the old checkbox stays off`() {
@@ -94,7 +122,7 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
 
     fun `test unchecking PHP leaves PHP files to the IDE but still formats Blade files`() {
         projectSettings.formatPhp = false
-        val descriptor = LaravelFmtLspServerDescriptor(project)
+        val descriptor = LaravelFmtLspClientDescriptor(project)
 
         assertFalse(descriptor.isSupportedFile(file("Example.php", "<?php echo 1;\n")))
         assertTrue(descriptor.isSupportedFile(file("welcome.blade.php", "<div></div>\n")))
@@ -102,7 +130,7 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
 
     fun `test unchecking Blade leaves Blade files to the IDE even though they are PHP files`() {
         projectSettings.formatBlade = false
-        val descriptor = LaravelFmtLspServerDescriptor(project)
+        val descriptor = LaravelFmtLspClientDescriptor(project)
 
         assertFalse(descriptor.isSupportedFile(file("welcome.blade.php", "<div></div>\n")))
         assertTrue(descriptor.isSupportedFile(file("Example.php", "<?php echo 1;\n")))
@@ -126,7 +154,7 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
     }
 
     fun `test Run laravel-fmt is listed on the Actions on Save page`() {
-        val providers = ExtensionPointName<ActionOnSaveInfoProvider>("com.intellij.actionOnSaveInfoProvider").extensionList
+        val providers = ActionOnSaveInfoProvider.EP_NAME.extensionList
 
         assertTrue(providers.any { it is LaravelFmtOnSaveInfoProvider })
     }
@@ -148,8 +176,8 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
     fun `test saving a file outside the project does not format it`() {
         val outside = LightVirtualFile("Outside.php", PhpFileType.INSTANCE, "<?php echo 1;\n")
 
-        assertTrue(LaravelFmtOnSaveAction.formatsOnSave(project, file("Example.php", "<?php echo 1;\n")))
-        assertFalse(LaravelFmtOnSaveAction.formatsOnSave(project, outside))
+        assertTrue(formatsOnSave(project, file("Example.php", "<?php echo 1;\n")))
+        assertFalse(formatsOnSave(project, outside))
     }
 
     fun `test files the IDE's Reformat code save action covers are not formatted twice on save`() {
@@ -157,7 +185,7 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
 
         FormatOnSaveOptions.getInstance(project).isRunOnSaveEnabled = true
 
-        assertFalse(LaravelFmtOnSaveAction.formatsOnSave(project, php))
+        assertFalse(formatsOnSave(project, php))
     }
 
     fun `test settings page shows its name`() {
@@ -186,13 +214,13 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
     private fun startsServerFor(file: VirtualFile): Boolean {
         var started = false
 
-        val starter = object : LspServerSupportProvider.LspServerStarter {
-            override fun ensureServerStarted(descriptor: LspServerDescriptor) {
+        val starter = object : LspIntegrationProvider.LspClientStarter {
+            override fun ensureClientStarted(descriptor: LspClientDescriptor) {
                 started = true
             }
         }
 
-        LaravelFmtLspServerSupportProvider().fileOpened(project, file, starter)
+        LaravelFmtLspIntegrationProvider().fileOpened(project, file, starter)
 
         return started
     }

@@ -8,9 +8,9 @@ import com.intellij.openapi.util.Key
 class LaravelFmtDocumentMerger : DocumentMerger {
 
     override fun updateDocument(document: Document, newText: String): Boolean {
-        val pending = document.getUserData(PENDING) ?: return false
+        val pending = document.getUserData(PENDING_EDITS) ?: return false
 
-        document.putUserData(PENDING, null)
+        document.putUserData(PENDING_EDITS, null)
 
         // The offsets only hold for the text laravel-fmt formatted, and only produce the text it returned.
         if (pending.stamp != document.modificationStamp || pending.text != newText) return false
@@ -21,8 +21,7 @@ class LaravelFmtDocumentMerger : DocumentMerger {
     }
 
     data class Pending(val stamp: Long, val text: String, val replacements: List<LspTextEdits.Replacement>)
-
-    companion object {
-        val PENDING = Key.create<Pending>("laravel-fmt.pending")
-    }
 }
+
+/** Top level: an extension's companion object may only hold constants and a logger. */
+val PENDING_EDITS: Key<LaravelFmtDocumentMerger.Pending> = Key.create("laravel-fmt.pending")

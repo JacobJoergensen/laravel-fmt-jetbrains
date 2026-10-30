@@ -5,12 +5,15 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
 import java.io.IOException
+import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermissions
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -97,6 +100,27 @@ class BinaryCacheTest {
         assertEquals(first, second)
         assertEquals("v1", Files.readString(first))
         assertEquals(1, downloads)
+    }
+
+    @Test
+    fun `a cached release that lost its execute bit is downloaded again`() {
+        // Windows has no execute bit to lose.
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"))
+
+        val cache = BinaryCache(temp.resolve("cache"))
+        var downloads = 0
+        val download = {
+            downloads++
+            "v1".toByteArray()
+        }
+
+        val binary = cache.release("release-0.3.0_Linux_x86_64", "laravel-fmt", download)
+        Files.setPosixFilePermissions(binary, PosixFilePermissions.fromString("rw-------"))
+
+        cache.release("release-0.3.0_Linux_x86_64", "laravel-fmt", download)
+
+        assertTrue(Files.isExecutable(binary))
+        assertEquals(2, downloads)
     }
 
     @Test

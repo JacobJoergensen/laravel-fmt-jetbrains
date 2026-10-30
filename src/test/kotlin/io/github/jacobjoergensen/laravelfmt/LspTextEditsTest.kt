@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test
 
 class LspTextEditsTest {
 
-    private val text = "<?php\n\$a  =  1;\necho 'x';\n\$b  =  2;\n"
+    private val text = $$"<?php\n$a  =  1;\necho 'x';\n$b  =  2;\n"
 
     @Test
     fun `a selection of the whole file formats the whole file`() {
@@ -28,12 +28,12 @@ class LspTextEditsTest {
 
     @Test
     fun `two ranges that split one change differently are left unformatted`() {
-        assertTrue(LspTextEdits.overlapping(listOf(edit(1, 3, "\$a = 1;\n"), edit(2, 4, "echo 'x';\n"))))
+        assertTrue(LspTextEdits.overlapping(listOf(edit(1, 3, $$"$a = 1;\n"), edit(2, 4, "echo 'x';\n"))))
     }
 
     @Test
     fun `changes that meet end to start are both applied`() {
-        assertFalse(LspTextEdits.overlapping(listOf(edit(1, 2, "\$a = 1;\n"), edit(2, 3, "echo 'x';\n"))))
+        assertFalse(LspTextEdits.overlapping(listOf(edit(1, 2, $$"$a = 1;\n"), edit(2, 3, "echo 'x';\n"))))
     }
 
     private fun edit(fromLine: Int, toLine: Int, newText: String) =

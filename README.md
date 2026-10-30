@@ -10,12 +10,15 @@ You'll need the binary: `composer require --dev jacobjoergensen/laravel-fmt`
 
 ## Requirements
 
-PhpStorm 2025.3 or later, or IntelliJ IDEA Ultimate with the PHP plugin.
+PhpStorm 2026.1.4 or later, or IntelliJ IDEA Ultimate with the PHP plugin.
 
 ## Usage
 
 It turns on by itself in projects that use laravel-fmt: `composer.json` requires it, or there's a
 `laravel-fmt.json` or `vendor/bin/laravel-fmt`. Other PHP projects keep PhpStorm's formatter.
+
+In a monorepo, each app that uses laravel-fmt runs its own installed version, so you get the same
+output as running its CLI. Apps that don't use it keep PhpStorm's formatter.
 
 Press Reformat Code (Ctrl+Alt+L, or ⌥⌘L on macOS) in a file, on a selection, or on a folder in the
 Project view.
@@ -27,7 +30,8 @@ To format on save, turn on Run on save in the settings below.
 It checks, in order:
 
 1. the path in Settings | Tools | laravel-fmt
-2. `vendor/bin/laravel-fmt`, including subfolders in a monorepo (trusted projects only)
+2. `vendor/bin/laravel-fmt` in the file's app, or in the surrounding folder, like a monorepo's root
+   (trusted projects only)
 3. your `PATH`
 
 If Composer ran in Sail or WSL, it downloads the same version for your system once. No PHP needed.

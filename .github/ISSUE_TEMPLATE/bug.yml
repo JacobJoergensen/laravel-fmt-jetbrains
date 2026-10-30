@@ -24,7 +24,7 @@ body:
     id: ide-version
     attributes:
       label: IDE version
-      description: From Help | About, e.g. PhpStorm 2025.3.1.
+      description: From Help | About, e.g. PhpStorm 2026.1.5.
     validations:
       required: true
   - type: input

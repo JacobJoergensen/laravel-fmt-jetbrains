@@ -12,12 +12,12 @@ import org.eclipse.lsp4j.TextEdit
 
 class LaravelFmtDocumentMergerTest : BasePlatformTestCase() {
 
-    private val unformatted = "<?php\nfunction  foo( \$a ){return \$a;}\n\$x = 1;\n\$y  =  2;\n"
+    private val unformatted = $$"<?php\nfunction  foo( $a ){return $a;}\n$x = 1;\n$y  =  2;\n"
 
     // Lines 1 and 3 change, line 2 doesn't.
     private val edits = listOf(
-        TextEdit(Range(Position(1, 0), Position(2, 0)), "function foo(\$a)\n{\n    return \$a;\n}\n"),
-        TextEdit(Range(Position(3, 0), Position(4, 0)), "\$y = 2;\n"),
+        TextEdit(Range(Position(1, 0), Position(2, 0)), $$"function foo($a)\n{\n    return $a;\n}\n"),
+        TextEdit(Range(Position(3, 0), Position(4, 0)), $$"$y = 2;\n"),
     )
 
     private val formatted = LspTextEdits.applyEdits(unformatted, edits)
@@ -58,11 +58,11 @@ class LaravelFmtDocumentMergerTest : BasePlatformTestCase() {
     private fun configure(): Document = myFixture.configureByText("Example.php", unformatted).fileDocument
 
     private fun foldUnchangedLine(document: Document): FoldRegion {
-        val start = document.text.indexOf("\$x = 1;")
+        val start = document.text.indexOf($$"$x = 1;")
         var fold: FoldRegion? = null
 
         myFixture.editor.foldingModel.runBatchFoldingOperation {
-            fold = myFixture.editor.foldingModel.addFoldRegion(start, start + "\$x = 1;".length, "...")
+            fold = myFixture.editor.foldingModel.addFoldRegion(start, start + $$"$x = 1;".length, "...")
         }
 
         return fold!!
@@ -71,10 +71,9 @@ class LaravelFmtDocumentMergerTest : BasePlatformTestCase() {
     private fun expectFormat(document: Document) {
         val replacements = LspTextEdits.replacements(unformatted, edits)
 
-        document.putUserData(LaravelFmtDocumentMerger.PENDING, LaravelFmtDocumentMerger.Pending(document.modificationStamp, formatted, replacements))
+        document.putUserData(PENDING_EDITS, LaravelFmtDocumentMerger.Pending(document.modificationStamp, formatted, replacements))
     }
 
-    /** What the formatting framework does with a formatter's result. */
     private fun merge(document: Document, text: String = formatted): Boolean =
         WriteCommandAction.runWriteCommandAction(project, Computable { DocumentMerger.EP_NAME.extensionList.any { it.updateDocument(document, text) } })
 }

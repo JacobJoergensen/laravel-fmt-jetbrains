@@ -2,15 +2,11 @@ package io.github.jacobjoergensen.laravelfmt
 
 import java.io.File
 
-/** Where a Composer install of laravel-fmt keeps the native binary its `vendor/bin` wrapper downloads. */
 object ComposerInstall {
 
     const val PACKAGE = "jacobjoergensen/laravel-fmt"
 
-    /**
-     * File name of the downloaded native binary (mirrors `BinaryDownloader::cachedPath()`), or `null` on an
-     * unsupported platform.
-     */
+    /** Mirrors `BinaryDownloader::cachedPath()`. */
     private fun nativeName(os: Os, arch: Arch?): String? {
         arch ?: return null
 
@@ -23,7 +19,6 @@ object ComposerInstall {
         return "${BinaryResolver.BASE_NAME}-${os.composerName}-${arch.composerName}$suffix"
     }
 
-    /** The native binary next to the wrapper at [resolvedPath], or `null` if it isn't a Composer install. */
     fun nativeBinary(
         resolvedPath: String,
         os: Os,
@@ -37,7 +32,6 @@ object ComposerInstall {
             return null
         }
 
-        // <vendor>/bin/laravel-fmt -> <vendor>/jacobjoergensen/laravel-fmt/bin/<native>
         val vendorDir = binDir.substringBeforeLast('/', missingDelimiterValue = "")
         val packageDir = "$vendorDir/$PACKAGE"
 
@@ -45,7 +39,6 @@ object ComposerInstall {
             return "$packageDir/bin/$name"
         }
 
-        // <vendor>/jacobjoergensen/laravel-fmt/bin/laravel-fmt -> <native> next to it
         if (binDir.endsWith("/$PACKAGE/bin")) {
             return "$binDir/$name"
         }
