@@ -15,8 +15,6 @@ object LspTextEdits {
 
     private val byStart = compareBy<TextEdit, Position>(byPosition) { it.range.start }
 
-    fun applyEdits(text: String, edits: List<TextEdit>): String = apply(text, replacements(text, edits))
-
     /** Last first, so earlier offsets stay valid. */
     fun replacements(text: String, edits: List<TextEdit>): List<Replacement> {
         val lineStarts = lineStarts(text)

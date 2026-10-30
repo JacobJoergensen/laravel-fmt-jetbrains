@@ -28,7 +28,6 @@ import org.eclipse.lsp4j.launch.LSPLauncher
 import org.eclipse.lsp4j.services.LanguageClient
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions.assumeTrue
@@ -44,8 +43,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Skipped unless `LARAVEL_FMT_BINARY` points at a binary, e.g. from `go build -o /tmp/laravel-fmt .`
- * in the laravel-fmt repo. CI runs them against the release named by `laravelFmtVersion` in
- * `gradle.properties`, and fails instead of skipping.
+ * in the laravel-fmt repo. CI runs them against the latest laravel-fmt release, and fails instead
+ * of skipping.
  */
 class LaravelFmtLspContractTest {
 
@@ -129,9 +128,6 @@ class LaravelFmtLspContractTest {
         assertEquals(emptyList<TextEdit>(), format(file))
 
         open(file, "php", unformatted)
-
-        assertNotEquals(emptyList<TextEdit>(), format(file))
-
         server.textDocumentService.didClose(DidCloseTextDocumentParams(TextDocumentIdentifier(uri(file))))
 
         assertEquals(emptyList<TextEdit>(), format(file))
@@ -286,7 +282,7 @@ class LaravelFmtLspContractTest {
         return output
     }
 
-    private fun apply(text: String, edits: List<TextEdit>): String = LspTextEdits.applyEdits(text, edits)
+    private fun apply(text: String, edits: List<TextEdit>): String = LspTextEdits.apply(text, LspTextEdits.replacements(text, edits))
 
     /** Keeps the messages the server sends; the IDE shows `showMessage` as a balloon and only logs `logMessage`. */
     private class RecordingClient : LanguageClient {

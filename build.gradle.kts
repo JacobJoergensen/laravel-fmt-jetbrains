@@ -109,7 +109,7 @@ tasks.test {
     useJUnitPlatform()
 
     // The LSP contract tests run against this binary, so a cached result must not stand in for a different one.
-    inputs.property("laravelFmtVersion", providers.gradleProperty("laravelFmtVersion"))
+    inputs.property("laravelFmtVersion", providers.environmentVariable("LARAVEL_FMT_VERSION").orElse(""))
     inputs.property("laravelFmtBinary", providers.environmentVariable("LARAVEL_FMT_BINARY").orElse(""))
     inputs.property("ci", providers.environmentVariable("CI").orElse(""))
 }

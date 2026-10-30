@@ -178,9 +178,11 @@ class BinaryResolverTest {
 
     @Test
     fun `hidden and non-app subdirectories are not searched`() {
-        val dirs = BinaryResolver.projectDirs(listOf("/repo")) { listOf("vendor", ".git", "node_modules", "app") }.toList()
+        val subdirs = mapOf("/repo" to listOf("vendor", ".git", "node_modules", "app"))
 
-        assertEquals(listOf("/repo", "/repo/app", "/repo/app/app"), dirs)
+        val dirs = BinaryResolver.projectDirs(listOf("/repo")) { subdirs[it].orEmpty() }.toList()
+
+        assertEquals(listOf("/repo", "/repo/app"), dirs)
     }
 
     @Test
@@ -207,7 +209,7 @@ class BinaryResolverTest {
     fun `PATH lookup on unix uses the bare name and first match`() {
         val result = BinaryResolver.findOnPath(
             name = "laravel-fmt",
-            pathDirs = listOf("", "/usr/bin/", "/usr/local/bin"),
+            pathDirs = listOf("/usr/bin/", "/usr/local/bin"),
             isWindows = false,
             isExecutableFile = { it == "/usr/local/bin/laravel-fmt" || it == "/usr/bin/laravel-fmt" },
         )

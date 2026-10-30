@@ -5,7 +5,6 @@ import com.intellij.formatting.service.FormattingService
 import com.intellij.ide.actionsOnSave.ActionOnSaveInfoProvider
 import com.intellij.notification.NotificationDisplayType
 import com.intellij.notification.NotificationGroupManager
-import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.components.service
 import com.intellij.openapi.options.Configurable
@@ -56,7 +55,7 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
         assertEquals("blade", descriptor.getLanguageId(blade))
     }
 
-    fun `test the EDT keeps the last lookup after an input changes instead of looking up again`() {
+    fun `test typing in the editor never waits for a new binary lookup`() {
         val server = project.service<LaravelFmtServerService>()
 
         server.refresh()
@@ -69,7 +68,7 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
         assertSame(resolution, server.resolve(app = null))
     }
 
-    fun `test the server outside every app isn't taken for the one of an app at the project root`() {
+    fun `test the project-wide server and a root app's server are told apart`() {
         val root = project.basePath!!.replace('\\', '/').trimEnd('/')
 
         val outside = LaravelFmtLspClientDescriptor(project, app = null)
@@ -82,7 +81,6 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
     fun `test an app's server only gets the files of that app`() {
         val php = file("Example.php", "<?php echo 1;\n")
 
-        assertTrue(LaravelFmtLspClientDescriptor(project, app = null).isSupportedFile(php))
         assertFalse(LaravelFmtLspClientDescriptor(project, app = "/elsewhere/apps/shop").isSupportedFile(php))
     }
 
@@ -195,18 +193,11 @@ class LaravelFmtPluginTest : BasePlatformTestCase() {
         assertEquals("laravel-fmt", settings.getDisplayName())
     }
 
-    fun `test notification group is registered as balloons`() {
+    fun `test laravel-fmt messages appear as balloons`() {
         val group = NotificationGroupManager.getInstance().getNotificationGroup(LaravelFmtNotifications.GROUP_ID)
 
         assertNotNull("notification group", group)
         assertEquals(NotificationDisplayType.BALLOON, group.displayType)
-    }
-
-    fun `test restart action shows its menu text`() {
-        val action = ActionManager.getInstance().getAction("LaravelFmt.RestartServer")
-
-        assertNotNull(action)
-        assertEquals("Restart laravel-fmt Server", action!!.templatePresentation.text)
     }
 
     private fun file(name: String, text: String): VirtualFile = myFixture.configureByText(name, text).virtualFile

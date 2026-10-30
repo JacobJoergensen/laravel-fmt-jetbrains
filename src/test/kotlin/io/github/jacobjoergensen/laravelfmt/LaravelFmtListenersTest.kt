@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test
 class LaravelFmtListenersTest {
 
     @Test
-    fun `setup listener reacts to the install and the project's own config files only`() {
+    fun `only changes to the install or the project's own config restart laravel-fmt`() {
         assertTrue(affectsLaravelFmt("/p/vendor/bin/laravel-fmt"))
         assertTrue(affectsLaravelFmt("C:\\p\\vendor\\bin\\laravel-fmt.bat"))
         assertTrue(affectsLaravelFmt("/p/vendor/jacobjoergensen/laravel-fmt"))
