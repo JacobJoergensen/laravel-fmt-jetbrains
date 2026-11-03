@@ -1,7 +1,11 @@
 # Changelog
 
 ## Unreleased
+
+## Version 0.3.0 (2026-11-03)
 * Changed the minimum PhpStorm version to 2026.1.4
+* Improved format on save to run laravel-fmt once per file instead of twice
+* Fixed Reformat Code skipping a file with unsaved changes that isn't open in an editor
 * Fixed monorepo apps all running the first laravel-fmt found, instead of their own version
 * Fixed Automatic mode formatting monorepo apps that don't use laravel-fmt
 * Fixed Reformat Code and format on save converting the line endings of a file laravel-fmt could not parse

@@ -46,7 +46,6 @@ class BinaryCache(private val root: Path, private val clock: Clock = Clock.syste
         return markUsed(target)
     }
 
-    /** Writes under a temp name first, so nothing ever runs a half-written executable. */
     private fun install(target: Path, isIntact: () -> Boolean, write: (Path) -> Unit) {
         val dir = Files.createDirectories(target.parent)
         val temp = Files.createTempFile(dir, "partial-", ".tmp")

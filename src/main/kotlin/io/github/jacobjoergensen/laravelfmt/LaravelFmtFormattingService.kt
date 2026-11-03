@@ -1,5 +1,7 @@
 package io.github.jacobjoergensen.laravelfmt
 
+import com.google.gson.JsonObject
+import com.google.gson.JsonPrimitive
 import com.intellij.formatting.FormattingContext
 import com.intellij.formatting.service.AsyncDocumentFormattingService
 import com.intellij.formatting.service.AsyncFormattingRequest
@@ -24,6 +26,8 @@ import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.TextDocumentIdentifier
 import org.eclipse.lsp4j.TextDocumentItem
 import org.eclipse.lsp4j.TextEdit
+import org.eclipse.lsp4j.services.LanguageServer
+import java.util.concurrent.CompletableFuture
 
 /** Under the 30 seconds after which the formatting framework reports a timeout of its own. */
 private const val FORMAT_TIMEOUT_MS = 25_000
@@ -50,7 +54,7 @@ class LaravelFmtFormattingService : AsyncDocumentFormattingService() {
         // PhpStorm doesn't start servers in a project that isn't trusted.
         if (!server.formats(virtualFile) || !TrustedProjects.isProjectTrusted(project)) return false
 
-        // Called often and on the EDT, so it only checks for a binary. The task starts the server.
+        // Called often and on the EDT, so it only checks for a binary.
         return server.resolve(server.appFor(virtualFile))?.path != null
     }
 
@@ -93,6 +97,9 @@ private class LaravelFmtFormattingTask(
         val server = awaitServer() ?: return request.onTextReady(null)
         val textDocument = server.getDocumentIdentifier(file)
 
+        if (formatsSentText(server)) return formatSentText(server, textDocument)
+
+        // PhpStorm also opens unsaved files that aren't in an editor, which unopened misses; servers with the format request avoid this.
         if (unopened) {
             val item = TextDocumentItem(textDocument.uri, server.descriptor.getLanguageId(file), 0, text)
 
@@ -115,11 +122,13 @@ private class LaravelFmtFormattingTask(
     }
 
     private fun format(server: LspClient, textDocument: TextDocumentIdentifier) {
-        val edits = if (ranges == null) {
-            server.sendRequestSync(FORMAT_TIMEOUT_MS) { it.textDocumentService.formatting(DocumentFormattingParams(textDocument, options)) }
-        } else {
-            rangeEdits(server, textDocument, ranges)
-        }
+        val edits = requestEach(server) { lsp, range ->
+            if (range == null) {
+                lsp.textDocumentService.formatting(DocumentFormattingParams(textDocument, options))
+            } else {
+                lsp.textDocumentService.rangeFormatting(DocumentRangeFormattingParams(textDocument, options, range))
+            }
+        }?.let(::combined)
 
         request.onTextReady(formatted(edits))
 
@@ -131,6 +140,18 @@ private class LaravelFmtFormattingTask(
                     (lsp as LaravelFmtLanguageServer).endOfLine(LaravelFmtLanguageServer.EndOfLineParams(textDocument))
                 }
             }
+        }
+    }
+
+    private fun formatSentText(server: LspClient, textDocument: TextDocumentIdentifier) {
+        val results = requestEach(server) { lsp, range ->
+            (lsp as LaravelFmtLanguageServer).format(LaravelFmtLanguageServer.FormatParams(textDocument, text, range))
+        } ?: return request.onTextReady(null)
+
+        request.onTextReady(formatted(combined(results.map { it.edits })))
+
+        if (ranges == null && !cancelled) {
+            project.service<LaravelFmtLineEndings>().afterFormat(file) { results.single().endOfLine }
         }
     }
 
@@ -170,20 +191,28 @@ private class LaravelFmtFormattingTask(
         return null
     }
 
-    // A change two ranges touch comes back from both.
-    private fun rangeEdits(server: LspClient, textDocument: TextDocumentIdentifier, ranges: List<Range>): List<TextEdit>? {
-        val edits = mutableListOf<TextEdit>()
+    /** One request for the whole file, or one per range. Null once one fails or the task is cancelled. */
+    private fun <T : Any> requestEach(server: LspClient, send: (LanguageServer, Range?) -> CompletableFuture<T>): List<T>? {
+        val results = mutableListOf<T>()
 
-        for (range in ranges) {
+        for (range in ranges ?: listOf(null)) {
             if (cancelled) return null
 
-            edits += server.sendRequestSync(FORMAT_TIMEOUT_MS) {
-                it.textDocumentService.rangeFormatting(DocumentRangeFormattingParams(textDocument, options, range))
-            } ?: return null
+            results += server.sendRequestSync(FORMAT_TIMEOUT_MS) { send(it, range) } ?: return null
         }
 
-        return edits.distinct().takeUnless(LspTextEdits::overlapping)
+        return results
     }
+
+    // A change two ranges touch comes back from both.
+    private fun combined(edits: List<List<TextEdit>>): List<TextEdit>? =
+        if (ranges == null) edits.single() else edits.flatten().distinct().takeUnless(LspTextEdits::overlapping)
+}
+
+private fun formatsSentText(server: LspClient): Boolean {
+    val experimental = server.initializeResult?.capabilities?.experimental as? JsonObject
+
+    return (experimental?.get(LaravelFmtLanguageServer.FORMAT_CAPABILITY) as? JsonPrimitive)?.asBoolean == true
 }
 
 private fun start(project: Project, app: String?): Boolean =

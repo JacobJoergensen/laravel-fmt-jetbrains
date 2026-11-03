@@ -18,8 +18,6 @@ import java.nio.charset.StandardCharsets
 /**
  * One server per app (see [LaravelFmtUsage]), so each app's files run the laravel-fmt version that app
  * installed, from its own folder. [app] is null for the server of files outside every app.
- *
- * Only formatting is configured: the server advertises nothing else, so other LSP features stay off.
  */
 class LaravelFmtLspClientDescriptor(project: Project, val app: String? = null) :
     LspClientDescriptor(project, presentableName(project, app), *roots(project, app)) {
@@ -38,10 +36,7 @@ class LaravelFmtLspClientDescriptor(project: Project, val app: String? = null) :
 
     override fun getLanguageId(file: VirtualFile): String = (fileKind(file) ?: FileKind.PHP).languageId
 
-    /**
-     * The first run may download the binary (see [LaravelFmtLauncher]), which is fine here: the IDE calls
-     * this on a pooled thread. A failure shows a notification and marks the server as failed.
-     */
+    /** May download the binary (see [LaravelFmtLauncher]); fine, since the IDE calls this on a pooled thread. */
     override fun createCommandLine(): GeneralCommandLine {
         val executable = try {
             LaravelFmtLauncher.prepare(project, app)

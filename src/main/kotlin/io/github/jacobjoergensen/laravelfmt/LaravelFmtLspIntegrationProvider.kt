@@ -9,7 +9,6 @@ import com.intellij.platform.lsp.api.LspClientDescriptor
 import com.intellij.platform.lsp.api.LspIntegrationProvider
 import com.intellij.platform.lsp.api.lsWidget.LspClientWidgetItem
 
-/** Only a missing binary gets a notification, instead of a server error. */
 class LaravelFmtLspIntegrationProvider : LspIntegrationProvider {
 
     override fun fileOpened(project: Project, file: VirtualFile, clientStarter: LspIntegrationProvider.LspClientStarter) {

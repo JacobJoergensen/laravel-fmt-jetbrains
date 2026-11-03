@@ -1,5 +1,6 @@
 package io.github.jacobjoergensen.laravelfmt
 
+import com.google.gson.JsonObject
 import org.eclipse.lsp4j.ClientCapabilities
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
 import org.eclipse.lsp4j.DidCloseTextDocumentParams
@@ -28,6 +29,7 @@ import org.eclipse.lsp4j.launch.LSPLauncher
 import org.eclipse.lsp4j.services.LanguageClient
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions.assumeTrue
@@ -203,7 +205,7 @@ class LaravelFmtLspContractTest {
 
     @Test
     fun `a file that does not parse keeps its line ending`() {
-        assumeServerAtLeast(initialize().serverInfo?.version, "0.7.1")
+        assumeServerAtLeast(initialize().serverInfo?.version, "0.8.0")
         write("laravel-fmt.json", """{ "endOfLine": "lf" }""")
         val text = "<?php\r\nfunction (\r\n"
         val file = write("broken.php", text)
@@ -211,6 +213,54 @@ class LaravelFmtLspContractTest {
 
         assertEquals(emptyList<TextEdit>(), format(file))
         assertEquals("auto", endOfLine(file))
+    }
+
+    @Test
+    fun `the server advertises formatting sent text`() {
+        val result = initialize()
+        assumeServerAtLeast(result.serverInfo?.version, "0.8.0")
+
+        val experimental = assertInstanceOf(JsonObject::class.java, result.capabilities.experimental)
+
+        assertTrue(experimental.get(LaravelFmtLanguageServer.FORMAT_CAPABILITY).asBoolean)
+    }
+
+    @Test
+    fun `sent text is formatted without the file being open, with the configured line ending`() {
+        assumeServerAtLeast(initialize().serverInfo?.version, "0.8.0")
+        write("laravel-fmt.json", """{ "endOfLine": "crlf" }""")
+        val file = write("app/Example.php", "<?php\n")
+
+        val result = sentTextFormat(file, unformatted)
+
+        // The CLI writes the configured line ending; the server leaves that to the client.
+        assertEquals(cliFormat(file, unformatted).replace("\r\n", "\n"), apply(unformatted, result.edits))
+        assertEquals("crlf", result.endOfLine)
+    }
+
+    @Test
+    fun `sent text with a range only has the requested lines formatted`() {
+        assumeServerAtLeast(initialize().serverInfo?.version, "0.8.0")
+        val text = $$"<?php\n\n$a  =  1;\necho 'x';\n$b  =  2;\n"
+        val file = write("range.php", text)
+
+        val result = apply(text, sentTextFormat(file, text, Range(Position(2, 0), Position(2, 9))).edits)
+
+        assertTrue(result.contains($$"$a = 1;"), result)
+        assertTrue(result.contains($$"$b  =  2;"), result)
+    }
+
+    @Test
+    fun `sent text that does not parse is left alone and keeps its line ending`() {
+        assumeServerAtLeast(initialize().serverInfo?.version, "0.8.0")
+        write("laravel-fmt.json", """{ "endOfLine": "lf" }""")
+        val text = "<?php\r\nfunction (\r\n"
+        val file = write("broken.php", text)
+
+        val result = sentTextFormat(file, text)
+
+        assertEquals(emptyList<TextEdit>(), result.edits)
+        assertEquals("auto", result.endOfLine)
     }
 
     @Test
@@ -267,6 +317,9 @@ class LaravelFmtLspContractTest {
         server.textDocumentService
             .formatting(DocumentFormattingParams(TextDocumentIdentifier(uri(file)), FormattingOptions(4, true)))
             .get(30, TimeUnit.SECONDS)
+
+    private fun sentTextFormat(file: Path, text: String, range: Range? = null): LaravelFmtLanguageServer.FormatResult =
+        server.format(LaravelFmtLanguageServer.FormatParams(TextDocumentIdentifier(uri(file)), text, range)).get(30, TimeUnit.SECONDS)
 
     private fun cliFormat(file: Path, text: String): String {
         val cli = ProcessBuilder(binary, "--stdin-filepath", file.toString())

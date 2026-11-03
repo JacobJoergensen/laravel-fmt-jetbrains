@@ -54,6 +54,15 @@ class LaravelFmtLineEndingsTest : BasePlatformTestCase() {
         assertEquals(stamp, file.modificationStamp)
     }
 
+    fun `test a file without line breaks is not written`() {
+        val file = file("<?php echo 1;")
+        val stamp = file.modificationStamp
+
+        afterFormat(file) { "crlf" }
+
+        assertEquals(stamp, file.modificationStamp)
+    }
+
     private fun file(text: String): VirtualFile {
         val file = myFixture.tempDirFixture.createFile("Example.php")
 

@@ -28,8 +28,6 @@ import kotlin.time.Duration.Companion.seconds
  * When the binary resolves to the Composer wrapper (`vendor/bin/laravel-fmt`, a PHP script), runs the
  * native binary for this system instead, from the [BinaryCache]. Running the wrapper as the server would
  * need `php` on the IDE's PATH, add a PHP process, and lock an `.exe` under `vendor/` on Windows.
- *
- * Called on a pooled thread, so blocking here is fine.
  */
 object LaravelFmtLauncher {
 

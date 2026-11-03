@@ -53,7 +53,6 @@ class LaravelFmtNotifications(private val project: Project) {
 
     fun startFailed(message: String, details: String?) {
         once("start-failed\u0000$message\u0000${details.orEmpty()}") {
-            // Details are raw process output (e.g. a PHP exception), so escape them before rendering.
             val detailsHtml = details?.trim()?.takeIf { it.isNotEmpty() }
                 ?.let { "<br/><pre>${StringUtil.escapeXmlEntities(it.takeLast(MAX_DETAILS_LENGTH))}</pre>" }
                 .orEmpty()

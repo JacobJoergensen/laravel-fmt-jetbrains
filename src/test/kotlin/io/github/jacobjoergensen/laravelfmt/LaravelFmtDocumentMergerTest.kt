@@ -14,7 +14,6 @@ class LaravelFmtDocumentMergerTest : BasePlatformTestCase() {
 
     private val unformatted = $$"<?php\nfunction  foo( $a ){return $a;}\n$x = 1;\n$y  =  2;\n"
 
-    // Lines 1 and 3 change, line 2 doesn't.
     private val edits = listOf(
         TextEdit(Range(Position(1, 0), Position(2, 0)), $$"function foo($a)\n{\n    return $a;\n}\n"),
         TextEdit(Range(Position(3, 0), Position(4, 0)), $$"$y = 2;\n"),

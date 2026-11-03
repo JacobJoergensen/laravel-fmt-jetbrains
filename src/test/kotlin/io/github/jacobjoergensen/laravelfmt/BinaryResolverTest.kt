@@ -130,7 +130,7 @@ class BinaryResolverTest {
     }
 
     @Test
-    fun `returns null when nothing is found`() {
+    fun `nothing resolves when laravel-fmt is installed nowhere`() {
         val result = BinaryResolver.resolve(
             explicitPath = "",
             appDirs = listOf("/project"),
@@ -158,7 +158,7 @@ class BinaryResolverTest {
     }
 
     @Test
-    fun `project dirs reach two levels down but not three`(@TempDir repo: Path) {
+    fun `folders up to two levels below a root are searched, but not three`(@TempDir repo: Path) {
         Files.createDirectories(repo.resolve("apps/web/src"))
         val root = repo.toString().replace('\\', '/')
 

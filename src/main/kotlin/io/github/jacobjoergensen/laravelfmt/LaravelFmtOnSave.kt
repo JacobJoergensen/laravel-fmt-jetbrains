@@ -33,8 +33,8 @@ class LaravelFmtOnSaveAction : ActionsOnSaveFileDocumentManagerListener.ActionOn
             return
         }
 
-        // Looking PSI up can be a slow operation on the EDT; the cached one never parses, and a file saved from
-        // an editor already has it.
+        // Looking PSI up can be slow on the EDT; the cached one never parses, and a file saved from an editor
+        // already has it.
         val psiDocuments = PsiDocumentManager.getInstance(project)
         val files = documents.mapNotNull { document ->
             FileDocumentManager.getInstance().getFile(document)

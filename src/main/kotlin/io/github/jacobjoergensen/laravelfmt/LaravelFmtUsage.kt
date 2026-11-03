@@ -31,7 +31,7 @@ object LaravelFmtUsage {
             readFile("$dir/$COMPOSER_FILE")?.let(COMPOSER_REQUIREMENT::containsMatchIn) == true
     }.distinct().toList()
 
-    /** The app [path] belongs to: the innermost one, so an app nested in another formats its own files. */
+    /** The innermost app, so an app nested in another formats its own files. */
     fun appFor(path: String, apps: List<String>, ignoreCase: Boolean = false): String? =
         enclosingApps(path, apps, ignoreCase).firstOrNull()
 

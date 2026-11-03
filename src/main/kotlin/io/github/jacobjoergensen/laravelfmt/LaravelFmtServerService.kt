@@ -35,7 +35,6 @@ class LaravelFmtServerService(
 
     data class Resolution(
         val path: String?,
-        /** A `vendor/bin` binary exists but was skipped because the project isn't trusted. */
         val blockedByTrust: Boolean,
         val explicitPathMissing: String?,
     )
@@ -73,25 +72,22 @@ class LaravelFmtServerService(
         null -> false
     } && isOn { appFor(file) != null }
 
-    /** Takes a lambda so only Automatic mode looks anything up. */
     private fun isOn(usesLaravelFmt: () -> Boolean): Boolean = when (settings.mode) {
         LaravelFmtProjectSettings.Mode.AUTOMATIC -> usesLaravelFmt()
         LaravelFmtProjectSettings.Mode.ALWAYS -> true
         LaravelFmtProjectSettings.Mode.OFF -> false
     }
 
-    /** Null for a file outside every app, which only Always mode formats. */
     fun appFor(file: VirtualFile): String? = LaravelFmtUsage.appFor(file.path, apps(), ignoreCase = pathsIgnoreCase)
 
     fun apps(): List<String> = current().apps
 
-    /** [app] is null for files outside every app. Null for an app gone since the last lookup. */
+    /** Null for an app gone since the last lookup. */
     fun resolve(app: String?): Resolution? = current().resolutions[app ?: NO_APP]
 
     /**
-     * Looks the binary up afresh, for starting the server. Not on the EDT. The snapshot [resolve] reads only
-     * decides whether to start, without touching the disk; this checks the disk right before launching, so
-     * the server runs the binary that is there now, even for an app gone since the last lookup.
+     * Not on the EDT. Checks the disk right before launching, so the server runs the binary there now, even
+     * for an app gone since the last lookup.
      */
     fun resolveNow(app: String?): Resolution = compute(apps(), app, ::findOnPath)
 
@@ -106,11 +102,6 @@ class LaravelFmtServerService(
         }
     }
 
-    /**
-     * Off the EDT, a missing lookup or one older than the last [invalidate] is done first. The EDT, and a
-     * caller that doesn't [waitForNew], gets what there is, [NOTHING_YET] before the first lookup, and a new
-     * one starts in the background.
-     */
     private fun current(waitForNew: Boolean = !ApplicationManager.getApplication().isDispatchThread): Snapshot {
         val known = snapshot
 
@@ -144,7 +135,7 @@ class LaravelFmtServerService(
     }
 
     /**
-     * Every binary at once, so the EDT never has to look one up. `PATH` is searched once for all of them.
+     * Every binary at once, so the EDT never has to look one up.
      *
      * The roots are read before taking [lookUpLock]: a read action under it could wait for a write
      * action on the EDT, which may itself be waiting for the lock.
@@ -193,7 +184,7 @@ class LaravelFmtServerService(
         }
     }
 
-    /** Safe to call from any thread. Looks up again first, so the servers restart with the new lookup. */
+    /** Safe to call from any thread. */
     @Suppress("kotlin:S6310")
     fun restartServer() {
         invalidate()
@@ -208,7 +199,6 @@ class LaravelFmtServerService(
         }
     }
 
-    /** Debounced, for bursts of file events such as a `composer update`. */
     fun scheduleRestart() {
         synchronized(this) {
             pendingRestart?.cancel()
@@ -220,10 +210,6 @@ class LaravelFmtServerService(
         }
     }
 
-    /**
-     * An app runs its own install, or else the one of an app around it, like a monorepo root's `vendor/bin`.
-     * Files outside every app run the first install in the project.
-     */
     private fun compute(apps: List<String>, app: String?, pathLookup: (String) -> String?): Resolution {
         val explicitPath = service<LaravelFmtSettings>().binaryPath
         val trusted = TrustedProjects.isProjectTrusted(project)

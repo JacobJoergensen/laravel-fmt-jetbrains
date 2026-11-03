@@ -23,7 +23,6 @@ class LaravelFmtLineEndings(private val project: Project) {
         ApplicationManager.getApplication().invokeLater({
             val current = LoadTextUtil.detectLineSeparator(file, true)
 
-            // A file without line breaks has no separator to change.
             if (file.isValid && current != null && current != separator) {
                 // What the status bar does: saves the file and converts it as one undo step.
                 AbstractConvertLineSeparatorsAction.changeLineSeparators(project, file, separator)
